@@ -1,13 +1,13 @@
 section .multiboot
 align 8
 header_start:
-    dd 0xe85250d6                ; magic
-    dd 0                         ; architecture
-    dd header_end - header_start ; header length
-    dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start)) ; checksum
-    dw 0    ; type
-    dw 0    ; flags
-    dd 8    ; size
+    dd 0xe85250d6
+    dd 0
+    dd header_end - header_start
+    dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start))
+    dw 0
+    dw 0
+    dd 8
 header_end:
 
 section .bss
@@ -32,7 +32,7 @@ extern kernel_main
 _start:
     mov esp, stack_top
 
-    ; 4단계 페이징을 위한 임시 테이블 생성 (1GB 매핑)
+    ; 임시 페이징 설정 (1GB Identity Map)
     mov eax, p3_table
     or eax, 0b11
     mov [p4_table], eax
@@ -51,27 +51,22 @@ _start:
     cmp ecx, 512
     jne .map_p2
 
-    ; CR3 로드
     mov eax, p4_table
     mov cr3, eax
 
-    ; PAE 활성화
     mov eax, cr4
     or eax, 1 << 5
     mov cr4, eax
 
-    ; Long Mode 활성화
     mov ecx, 0xC0000080
     rdmsr
     or eax, 1 << 8
     wrmsr
 
-    ; 페이징 활성화
     mov eax, cr0
     or eax, 1 << 31
     mov cr0, eax
 
-    ; GDT 로드 후 64비트 점프
     lgdt [gdt64.pointer]
     jmp gdt64.code:long_mode_start
 
@@ -94,6 +89,11 @@ long_mode_start:
     mov fs, ax
     mov gs, ax
 
+    ; GRUB이 전달한 레지스터를 C 함수 인자로 설정 (System V ABI)
+    ; rax = magic, rbx = mb_info
+    mov rdi, rax      ; 첫 번째 인자: magic
+    mov rsi, rbx      ; 두 번째 인자: multiboot_info pointer
+    
     call kernel_main
 
     cli
