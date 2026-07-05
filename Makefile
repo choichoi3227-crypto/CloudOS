@@ -6,8 +6,8 @@ CFLAGS = -ffreestanding -O0 -Wall -Wextra -mno-red-zone -m64 -fno-stack-protecto
 LDFLAGS = -T linker.ld -m elf_x86_64 -nostdlib
 ASFLAGS = -f elf64
 
-C_SOURCES = src/kernel.c src/vga.c src/idt.c src/keyboard.c src/string.c src/pmm.c src/vmm.c src/heap.c src/task.c src/timer.c
-ASM_SOURCES = src/boot.asm src/interrupt.asm
+C_SOURCES = src/kernel.c src/vga.c src/idt.c src/keyboard.c src/string.c src/pmm.c src/vmm.c src/heap.c src/task.c src/timer.c src/vfs.c
+ASM_SOURCES = src/boot.asm src/interrupt.asm src/gdt.asm
 OBJECTS = $(ASM_SOURCES:.asm=.o) $(C_SOURCES:.c=.o)
 
 CloudOS.iso: CloudOS.bin
