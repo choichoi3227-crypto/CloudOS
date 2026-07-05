@@ -2,12 +2,12 @@ CC = gcc
 LD = ld
 AS = nasm
 
-CFLAGS = -ffreestanding -O0 -Wall -mno-red-zone -m64 -fno-stack-protector -Isrc
+CFLAGS = -ffreestanding -O0 -Wall -Wextra -mno-red-zone -m64 -fno-stack-protector -Isrc/include
 LDFLAGS = -T linker.ld -m elf_x86_64 -nostdlib
 ASFLAGS = -f elf64
 
 C_SOURCES = src/kernel.c src/vga.c src/idt.c src/keyboard.c src/string.c
-ASM_SOURCES = src/boot.asm src/long_mode_init.asm src/interrupt.asm
+ASM_SOURCES = src/boot.asm src/interrupt.asm
 OBJECTS = $(ASM_SOURCES:.asm=.o) $(C_SOURCES:.c=.o)
 
 CloudOS.iso: CloudOS.bin
@@ -16,7 +16,7 @@ CloudOS.iso: CloudOS.bin
     echo 'set timeout=0' > isodir/boot/grub/grub.cfg
     echo 'set default=0' >> isodir/boot/grub/grub.cfg
     echo 'menuentry "CloudOS" {' >> isodir/boot/grub/grub.cfg
-    echo '  multiboot /boot/CloudOS.bin' >> isodir/boot/grub/grub.cfg
+    echo '  multiboot2 /boot/CloudOS.bin' >> isodir/boot/grub/grub.cfg
     echo '  boot' >> isodir/boot/grub/grub.cfg
     echo '}' >> isodir/boot/grub/grub.cfg
     grub-mkrescue -o $@ isodir
