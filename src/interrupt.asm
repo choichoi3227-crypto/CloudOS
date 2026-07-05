@@ -4,6 +4,7 @@ extern irq_handler_c
 
 global asm_irq_handler
 asm_irq_handler:
+    ; 레지스터 저장 (스택 프레임 구성)
     push r15
     push r14
     push r13
@@ -20,10 +21,9 @@ asm_irq_handler:
     push rbx
     push rax
     
-    mov rdi, rsp  ; 레지스터 프레임의 주소를 첫 번째 인자로 전달
+    mov rdi, rsp  ; 레지스터 프레임 주소 전달
     call irq_handler_c
     
-    ; 컨텍스트 스위칭 후 돌아올 때 스택(rsp)은 새 태스크의 스택으로 바뀌어 있음
     pop rax
     pop rbx
     pop rcx
