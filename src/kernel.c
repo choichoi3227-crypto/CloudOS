@@ -4,7 +4,6 @@
 #include "string.h"
 
 void kernel_main() {
-    // 1. 화면 초기화
     vga_init();
     vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     vga_print("CloudOS Kernel v1.0 (x86_64 Native)\n");
@@ -17,9 +16,10 @@ void kernel_main() {
     vga_print("[ OK ] Initializing Keyboard Driver...\n");
     keyboard_init();
     
+    __asm__ __volatile__("sti"); // 인터럽트 활성화
+    
     vga_print("[ OK ] System Ready.\n\n");
 
-    // 2. 로그인 루프 (로컬 DB 및 USB 시뮬레이션)
     while (1) {
         vga_set_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
         vga_print("CloudOS Login\n");
@@ -40,12 +40,11 @@ void kernel_main() {
                 vga_print("\b \b");
             } else if (c >= 32 && c <= 126) {
                 password[idx++] = c;
-                vga_print_char('*'); // 비밀번호 마스킹
+                vga_print_char('*');
             }
         }
         password[idx] = '\0';
         
-        // 로컬 DB 비밀번호 검증 (하드코딩: "password")
         if (strcmp(password, "password") == 0) {
             vga_set_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
             vga_print("\nLogin Success! Welcome to CloudOS.\n\n");
@@ -58,7 +57,6 @@ void kernel_main() {
         }
     }
 
-    // 3. 터미널 쉘 루프
     vga_print("Type 'help' for commands.\n");
     while (1) {
         vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
@@ -87,8 +85,7 @@ void kernel_main() {
         } else if (strcmp(cmd, "clear") == 0) {
             vga_init();
         } else if (strcmp(cmd, "about") == 0) {
-            vga_print("CloudOS Perfect Edition (Native)\n");
-            vga_print("Arch: x86_64 | RAM: 512MB+ | GUI: Pending\n");
+            vga_print("CloudOS Perfect Edition (Native)\nArch: x86_64 | GUI: Pending\n");
         } else if (strcmp(cmd, "exit") == 0) {
             vga_print("System Halted.\n");
             __asm__ __volatile__("cli; hlt");
