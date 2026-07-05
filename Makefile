@@ -1,0 +1,35 @@
+CC = gcc
+LD = ld
+AS = nasm
+
+CFLAGS = -ffreestanding -O2 -Wall -mno-red-zone -m64 -fno-stack-protector -Isrc/include
+LDFLAGS = -T linker.ld -m elf_x86_64 -nostdlib
+ASFLAGS = -f elf64
+
+C_SOURCES = src/kernel.c
+ASM_SOURCES = src/boot.asm
+OBJECTS = $(ASM_SOURCES:.asm=.o) $(C_SOURCES:.c=.o)
+
+CloudOS.iso: CloudOS.bin
+    mkdir -p isodir/boot/grub
+    cp CloudOS.bin isodir/boot/
+    echo 'set timeout=0' > isodir/boot/grub/grub.cfg
+    echo 'set default=0' >> isodir/boot/grub/grub.cfg
+    echo 'menuentry "CloudOS" {' >> isodir/boot/grub/grub.cfg
+    echo '  multiboot2 /boot/CloudOS.bin' >> isodir/boot/grub/grub.cfg
+    echo '  boot' >> isodir/boot/grub/grub.cfg
+    echo '}' >> isodir/boot/grub/grub.cfg
+    grub-mkrescue -o $@ isodir
+
+CloudOS.bin: $(OBJECTS)
+    $(LD) $(LDFLAGS) -o $@ $(OBJECTS)
+
+%.o: %.asm
+    $(AS) $(ASFLAGS) $< -o $@
+
+%.o: %.c
+    $(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+    rm -f $(OBJECTS) CloudOS.bin CloudOS.iso
+    rm -rf isodir
