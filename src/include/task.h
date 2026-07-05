@@ -15,13 +15,14 @@ struct registers {
 typedef struct task {
     uint64_t rsp;
     uint64_t* stack;
+    uint64_t pml4;       // 추가: 태스크 독립 PML4
     int id;
     int state; // 0: Ready, 1: Running, 2: Terminated
 } task_t;
 
 void task_init(void);
-void create_task(void (*entry)());
+void create_user_task(void (*entry)());
+void create_user_task_with_pml4(uint64_t entry, uint64_t pml4);
 void schedule(struct registers* regs);
-void task_switch(uint64_t* old_rsp, uint64_t new_rsp);
 
 #endif
