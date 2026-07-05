@@ -1,16 +1,15 @@
 #include "vmm.h"
 #include "pmm.h"
 #include "string.h"
-#include "vga.h"
 
-static uint64_t* pml4;
+static uint64_t* kernel_pml4;
 
 void vmm_init(void) {
-    pml4 = (uint64_t*)pmm_alloc_block();
-    for(int i = 0; i < 512; i++) pml4[i] = 0;
+    kernel_pml4 = (uint64_t*)pmm_alloc_block();
+    for(int i = 0; i < 512; i++) kernel_pml4[i] = 0;
 
     // 0~4GB 영역을 1:1(Identity) 매핑하여 커널 및 하드웨어 MMIO 접근 허용
-    for (uint64_t i = 0; i < 1024; i++) { // 1024 * 2MB = 2GB 매핑
+    for (uint64_t i = 0; i < 1024; i++) {
         uint64_t virt = i * 0x200000;
         uint64_t phys = virt;
         
@@ -19,12 +18,12 @@ void vmm_init(void) {
         uint64_t pd_idx = (virt >> 21) & 0x1FF;
 
         uint64_t* pdpt;
-        if(!(pml4[pml4_idx] & 1)) {
+        if(!(kernel_pml4[pml4_idx] & 1)) {
             pdpt = (uint64_t*)pmm_alloc_block();
             memset(pdpt, 0, 4096);
-            pml4[pml4_idx] = (uint64_t)pdpt | 0x3;
+            kernel_pml4[pml4_idx] = (uint64_t)pdpt | 0x3;
         } else {
-            pdpt = (uint64_t*)(pml4[pml4_idx] & ~0xFFF);
+            pdpt = (uint64_t*)(kernel_pml4[pml4_idx] & ~0xFFF);
         }
 
         uint64_t* pd;
@@ -36,13 +35,32 @@ void vmm_init(void) {
             pd = (uint64_t*)(pdpt[pdpt_idx] & ~0xFFF);
         }
 
-        // 2MB Huge Page 설정
         pd[pd_idx] = phys | 0x83; // Present | Writable | Huge Page
     }
 }
 
-void* vmm_map_page(physaddr_t phys, virtaddr_t virt, uint32_t flags) {
-    // 이제 이 함수는 물리 주소가 1:1 매핑되지 않은 새로운 영역에 사용됨
+// 커널 PML4 주소 반환
+static uint64_t get_kernel_pml4() {
+    return (uint64_t)kernel_pml4;
+}
+
+// 새로운 사용자 PML4 생성 (커널 공간 상위 256TB 복사)
+uint64_t vmm_create_user_pml4(void) {
+    uint64_t* new_pml4 = (uint64_t*)pmm_alloc_block();
+    memset(new_pml4, 0, 4096);
+    
+    // 커널 공간(인덱스 256~511) 복사
+    for(int i = 256; i < 512; i++) {
+        new_pml4[i] = kernel_pml4[i];
+    }
+    
+    return (uint64_t)new_pml4;
+}
+
+// 특정 PML4에 가상 주소 매핑
+void vmm_map_page_to_pml4(uint64_t pml4_addr, physaddr_t phys, virtaddr_t virt, uint32_t flags) {
+    uint64_t* pml4 = (uint64_t*)pml4_addr;
+    
     uint64_t pml4_idx = (virt >> 39) & 0x1FF;
     uint64_t pdpt_idx = (virt >> 30) & 0x1FF;
     uint64_t pd_idx = (virt >> 21) & 0x1FF;
@@ -76,5 +94,10 @@ void* vmm_map_page(physaddr_t phys, virtaddr_t virt, uint32_t flags) {
     }
 
     pt[pt_idx] = phys | flags | 0x1;
+}
+
+// 기본 커널 매핑용 (기존 호환성 유지)
+void* vmm_map_page(physaddr_t phys, virtaddr_t virt, uint32_t flags) {
+    vmm_map_page_to_pml4(get_kernel_pml4(), phys, virt, flags);
     return (void*)virt;
 }
