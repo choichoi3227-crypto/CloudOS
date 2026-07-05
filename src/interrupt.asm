@@ -4,7 +4,6 @@ extern irq_handler_c
 
 global asm_irq_handler
 asm_irq_handler:
-    ; 레지스터 저장
     push rax
     push rbx
     push rcx
@@ -21,11 +20,9 @@ asm_irq_handler:
     push r14
     push r15
 
-    ; C 핸들러 호출
     mov rdi, rsp
     call irq_handler_c
 
-    ; 레지스터 복원
     pop r15
     pop r14
     pop r13
@@ -42,5 +39,4 @@ asm_irq_handler:
     pop rbx
     pop rax
 
-    ; 인터럽트 종료
     iretq
