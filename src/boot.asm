@@ -32,7 +32,6 @@ extern kernel_main
 _start:
     mov esp, stack_top
 
-    ; 임시 페이징 설정 (1GB Identity Map)
     mov eax, p3_table
     or eax, 0b11
     mov [p4_table], eax
@@ -89,10 +88,8 @@ long_mode_start:
     mov fs, ax
     mov gs, ax
 
-    ; GRUB이 전달한 레지스터를 C 함수 인자로 설정 (System V ABI)
-    ; rax = magic, rbx = mb_info
-    mov rdi, rax      ; 첫 번째 인자: magic
-    mov rsi, rbx      ; 두 번째 인자: multiboot_info pointer
+    mov rdi, rax
+    mov rsi, rbx
     
     call kernel_main
 
