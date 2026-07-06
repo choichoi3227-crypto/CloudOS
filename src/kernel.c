@@ -1,6 +1,9 @@
 #include "vga.h"
 #include "idt.h"
 #include "keyboard.h"
+#include "mouse.h"
+#include "wm.h"
+#include "graphics.h"
 #include "string.h"
 #include "pmm.h"
 #include "vmm.h"
@@ -23,13 +26,33 @@ struct multiboot_info {
     uint32_t dummy[4];
     uint32_t mmap_length;
     uint32_t mmap_addr;
+    uint32_t drives_length;
+    uint32_t drives_addr;
+    uint32_t config_table;
+    uint32_t boot_loader_name;
+    uint32_t apm_table;
+    uint32_t vbe_control_info;
+    uint32_t vbe_mode_info;
+    uint16_t vbe_mode;
+    uint16_t vbe_interface_seg;
+    uint16_t vbe_interface_off;
+    uint16_t vbe_interface_len;
+    uint64_t framebuffer_addr;
+    uint32_t framebuffer_pitch;
+    uint32_t framebuffer_width;
+    uint32_t framebuffer_height;
+    uint8_t framebuffer_bpp;
 } __attribute__((packed));
 
 void kernel_main(struct multiboot_info* mb_info) {
-    vga_init();
+    // 1. 그래픽 모드 초기화
+    graphics_init(mb_info->framebuffer_addr, mb_info->framebuffer_pitch);
+    
+    // 텍스트 출력용 (그래픽 모드 위에 텍스트를 그림. 추후 제거됨)
+    vga_init(); 
     vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    vga_print("CloudOS Kernel v3.4 (Network Stack)\n");
-    vga_print("===================================\n");
+    vga_print("CloudOS Kernel v4.0 (GUI Mode)\n");
+    vga_print("=============================\n");
     vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     
     idt_init();
@@ -46,55 +69,49 @@ void kernel_main(struct multiboot_info* mb_info) {
     vga_print("[ OK ] Initializing Network...\n");
     e1000_init();
     
+    vga_print("[ OK ] Initializing Mouse...\n");
+    mouse_init();
+    
     task_init();
     timer_init(100);
     
+    // GUI 초기화
+    wm_init();
+    wm_create_window(200, 200, 400, 300, "CloudOS Explorer");
+    wm_create_window(600, 150, 300, 200, "Terminal");
+    
     __asm__ __volatile__("sti");
     
+    // 메인 GUI 루프
+    int prev_mx = -1, prev_my = -1, prev_mb = 0;
     while (1) {
-        vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-        vga_print("admin@cloudos:~$ ");
-        vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+        int mx = mouse_get_x();
+        int my = mouse_get_y();
+        int mb = mouse_get_btn();
         
-        char cmd[128];
-        int idx = 0;
-        while (idx < 127) {
-            char c = keyboard_getchar();
-            if (c == '\n') { vga_print("\n"); break; }
-            else if (c == '\b' && idx > 0) { idx--; vga_print("\b \b"); }
-            else if (c >= 32 && c <= 126) { cmd[idx++] = c; vga_print_char(c); }
-        }
-        cmd[idx] = '\0';
-        
-        if (strcmp(cmd, "help") == 0) {
-            vga_print("Commands: help, ls, write, read, run, ping, clear\n");
-        } else if (strcmp(cmd, "clear") == 0) {
-            vga_init();
-        } else if (strcmp(cmd, "ls") == 0) {
-            vfs_list_files();
-        } else if (strcmp(cmd, "write") == 0) {
-            char* test_data = "This is CloudOS permanent data!";
-            vfs_write_file("perm.txt", test_data, 31);
-            vga_print("File 'perm.txt' written to disk.\n");
-        } else if (strcmp(cmd, "read") == 0) {
-            char buf[64];
-            uint32_t read_bytes = vfs_read_file("perm.txt", buf, 64);
-            if (read_bytes > 0) {
-                buf[read_bytes] = '\0';
-                vga_print("File content: ");
-                vga_print(buf);
-                vga_print("\n");
-            } else {
-                vga_print("File not found.\n");
-            }
-        } else if (strcmp(cmd, "ping") == 0) {
-            vga_print("Waiting for ping from host... (Run 'ping 192.168.1.100' on Host OS)\n");
-        } else if (strncmp(cmd, "run ", 4) == 0) {
-            elf_load_and_exec(cmd + 4);
-        } else if (idx > 0) {
-            vga_print("Unknown command: ");
-            vga_print(cmd);
-            vga_print("\n");
+        // 마우스 상태가 변경되었을 때만 화면 갱신
+        if (mx != prev_mx || my != prev_my || mb != prev_mb) {
+            // 배경
+            draw_rect(0, 0, 1024, 768, 0x1E1E2E);
+            
+            // 상단 바
+            draw_rect(0, 0, 1024, 30, 0x000000);
+            draw_string("CloudOS", 10, 8, 0xFFFFFF);
+            
+            // 하단 Dock
+            draw_rect(0, 738, 1024, 30, 0x111111);
+            
+            // 창 관리자 렌더링
+            wm_handle_mouse(mx, my, mb);
+            wm_render();
+            
+            // 마우스 커서 그리기
+            draw_rect(mx, my, 10, 10, 0xFFFFFF);
+            
+            // 버퍼 스왑 (깜빡임 방지)
+            swap_buffers();
+            
+            prev_mx = mx; prev_my = my; prev_mb = mb;
         }
     }
 }
