@@ -1,11 +1,10 @@
-#include "vga.h"
-#include "idt.h"
-#include "keyboard.h"
-#include "string.h"
-#include "pmm.h"
-#include "cloudfs_core.h"
+#include <vga.h>
+#include <idt.h>
+#include <keyboard.h>
+#include <string.h>
+#include <pmm.h>
+#include <cloudfs_core.h>
 
-// 부트로더에서 전달된 포인터를 직접 받음
 void kernel_main(void* mb_info) {
     vga_init();
     vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
@@ -14,8 +13,6 @@ void kernel_main(void* mb_info) {
     vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     
     idt_init();
-    
-    // Multiboot2 포인터를 PMM으로 전달하여 메모리 맵 파싱
     pmm_init(mb_info);
     
     vga_print("[ OK ] Mounting CloudFS...\n");
