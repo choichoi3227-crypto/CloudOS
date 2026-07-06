@@ -1,6 +1,7 @@
 #include "idt.h"
 #include "io.h"
 #include "keyboard.h"
+#include "mouse.h"
 #include "timer.h"
 #include "task.h"
 #include "vga.h"
@@ -120,6 +121,10 @@ void irq_handler_c(struct registers* regs) {
     } else if (regs->int_no == 33) {
         keyboard_handle_scancode(inb(0x60));
         outb(0x20, 0x20);
+    } else if (regs->int_no == 44) { // IRQ 12 (Mouse)
+        mouse_handler();
+        outb(0x20, 0x20);
+        outb(0xA0, 0x20);
     } else if (regs->int_no == 43) {
         e1000_handler();
         outb(0x20, 0x20);
