@@ -34,7 +34,7 @@ void vmm_init(void) {
             pd = (uint64_t*)(pdpt[pdpt_idx] & ~0xFFF);
         }
 
-        pd[pd_idx] = phys | 0x83;
+        pd[pd_idx] = phys | 0x83; // Huge Page
     }
 }
 
@@ -51,7 +51,8 @@ uint64_t vmm_create_user_pml4(void) {
     return (uint64_t)new_pml4;
 }
 
-void vmm_map_page_to_pml4(uint64_t pml4_addr, physaddr_t phys, virtaddr_t virt, uint32_t flags) {
+// 수정: executable 인자 추가 및 NX 비트 처리
+void vmm_map_page_to_pml4(uint64_t pml4_addr, physaddr_t phys, virtaddr_t virt, uint32_t flags, int executable) {
     uint64_t* pml4 = (uint64_t*)pml4_addr;
     
     uint64_t pml4_idx = (virt >> 39) & 0x1FF;
@@ -86,10 +87,15 @@ void vmm_map_page_to_pml4(uint64_t pml4_addr, physaddr_t phys, virtaddr_t virt, 
         pt = (uint64_t*)(pd[pd_idx] & ~0xFFF);
     }
 
-    pt[pt_idx] = phys | flags | 0x1;
+    uint64_t entry_flags = phys | flags | 0x1;
+    if (!executable) {
+        entry_flags |= PAGE_NX; // 실행 불가능 영역 설정 (DEP)
+    }
+    pt[pt_idx] = entry_flags;
 }
 
 void* vmm_map_page(physaddr_t phys, virtaddr_t virt, uint32_t flags) {
-    vmm_map_page_to_pml4(get_kernel_pml4(), phys, virt, flags);
+    // 커널 매핑은 기본적으로 실행 가능으로 처리
+    vmm_map_page_to_pml4(get_kernel_pml4(), phys, virt, flags, 1);
     return (void*)virt;
 }
