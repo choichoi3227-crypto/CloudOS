@@ -15,9 +15,9 @@ struct registers {
 typedef struct task {
     uint64_t rsp;
     uint64_t* stack;
-    uint64_t pml4;       // 추가: 태스크 독립 PML4
+    uint64_t pml4;
     int id;
-    int state; // 0: Ready, 1: Running, 2: Terminated
+    int state;
 } task_t;
 
 void task_init(void);
