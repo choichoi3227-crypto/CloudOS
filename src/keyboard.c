@@ -2,8 +2,7 @@
 #include "io.h"
 
 static char kb_buffer[256];
-static int kb_head = 0;
-static int kb_tail = 0;
+static int kb_head = 0, kb_tail = 0;
 
 const char scancode_to_ascii[128] = {
     0, 27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
