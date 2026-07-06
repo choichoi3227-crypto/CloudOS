@@ -2,16 +2,12 @@ CC = gcc
 LD = ld
 AS = nasm
 
-CFLAGS = -ffreestanding -O2 -Wall -Wextra -mno-red-zone -m64 -fno-stack-protector -Isrc/include
+CFLAGS = -ffreestanding -O0 -Wall -Wextra -mno-red-zone -m64 -fno-stack-protector
 LDFLAGS = -T linker.ld -m elf_x86_64 -nostdlib
 ASFLAGS = -f elf64
 
-# 모듈형 디렉토리 구조 반영
-C_SOURCES = src/kernel/kernel.c src/kernel/syscall.c src/net/tcp.c src/pkg/cloudpkg.c src/sys/update.c \
-            src/gui/graphics.c src/gui/wm.c src/drivers/mouse.c src/drivers/ahci.c \
-            src/fs/cloudfs_v4.c src/mm/pmm.c src/mm/vmm.c src/mm/slab.c \
-            src/arch/x86_64/idt.c src/arch/x86_64/gdt.c src/lib/string.c
-ASM_SOURCES = src/arch/x86_64/boot.asm src/arch/x86_64/interrupt.asm
+C_SOURCES = src/kernel.c src/vga.c src/idt.c src/keyboard.c src/string.c src/pmm.c src/ide.c src/cloudfs_core.c
+ASM_SOURCES = src/boot.asm src/interrupt.asm
 OBJECTS = $(ASM_SOURCES:.asm=.o) $(C_SOURCES:.c=.o)
 
 CloudOS.iso: CloudOS.bin
@@ -39,4 +35,4 @@ clean:
     rm -rf isodir
 
 run: CloudOS.iso
-    qemu-system-x86_64 -cdrom CloudOS.iso -m 512M -drive file=disk.img,format=raw,id=disk,if=none -device ide-hd,drive=disk -netdev user,id=net0 -device e1000,netdev=net0
+    qemu-system-x86_64 -cdrom CloudOS.iso -m 256M -drive file=disk.img,format=raw,if=ide
