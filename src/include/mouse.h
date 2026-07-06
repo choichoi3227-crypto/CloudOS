@@ -7,5 +7,6 @@ void mouse_handler(void);
 int mouse_get_x(void);
 int mouse_get_y(void);
 int mouse_get_btn(void);
+int mouse_get_wheel(void); // 추가: 휠 스크롤
 
 #endif
