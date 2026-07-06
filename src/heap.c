@@ -3,8 +3,8 @@
 #include "pmm.h"
 #include "string.h"
 
-#define HEAP_START 0x1000000 // 16MB 지점
-#define HEAP_SIZE  0x100000  // 1MB 힙
+#define HEAP_START 0x1000000
+#define HEAP_SIZE  0x100000
 
 struct heap_block {
     size_t size;
