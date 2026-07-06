@@ -12,6 +12,7 @@ void draw_pixel(int x, int y, uint32_t color);
 void draw_rect(int x, int y, int width, int height, uint32_t color);
 void draw_char(char c, int x, int y, uint32_t color);
 void draw_string(const char* str, int x, int y, uint32_t color);
+void draw_number(uint64_t num, int x, int y, uint32_t color); // 추가
 void swap_buffers(void);
 
 #endif
