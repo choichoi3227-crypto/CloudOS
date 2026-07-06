@@ -2,12 +2,12 @@ CC = gcc
 LD = ld
 AS = nasm
 
-CFLAGS = -ffreestanding -O0 -Wall -Wextra -mno-red-zone -m64 -fno-stack-protector -Isrc/include
+CFLAGS = -ffreestanding -O2 -Wall -Wextra -mno-red-zone -m64 -fno-stack-protector -Isrc/include
 LDFLAGS = -T linker.ld -m elf_x86_64 -nostdlib
 ASFLAGS = -f elf64
 
-# gpu.c 추가
-C_SOURCES = src/kernel.c src/graphics.c src/mouse.c src/wm.c src/usb.c src/acpi.c src/audio.c src/security.c src/gpu.c src/idt.c src/keyboard.c src/string.c src/pmm.c src/vmm.c src/heap.c src/task.c src/timer.c src/vfs.c src/cloudfs.c src/ahci.c src/elf.c src/e1000.c src/net.c
+# optimizer.c, subsystem.c, browser.c 추가 및 최적화 레벨 -O2 적용
+C_SOURCES = src/kernel.c src/graphics.c src/mouse.c src/wm.c src/usb.c src/acpi.c src/audio.c src/security.c src/gpu.c src/cloudoptimizer.c src/subsystem.c src/browser.c src/idt.c src/keyboard.c src/string.c src/pmm.c src/vmm.c src/heap.c src/task.c src/timer.c src/vfs.c src/cloudfs.c src/ahci.c src/elf.c src/e1000.c src/net.c
 ASM_SOURCES = src/boot.asm src/interrupt.asm src/gdt.asm
 OBJECTS = $(ASM_SOURCES:.asm=.o) $(C_SOURCES:.c=.o)
 
