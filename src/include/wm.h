@@ -10,6 +10,7 @@ typedef struct {
     int is_open;
     int is_dragging;
     int drag_offset_x, drag_offset_y;
+    int close_clicked; // 추가: 창 닫기 요청 플래그
 } window_t;
 
 void wm_init(void);
