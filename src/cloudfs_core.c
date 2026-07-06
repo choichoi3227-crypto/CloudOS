@@ -1,7 +1,7 @@
-#include "cloudfs_core.h"
-#include "ide.h"
-#include "string.h"
-#include "vga.h"
+#include <cloudfs_core.h>
+#include <ide.h>
+#include <string.h>
+#include <vga.h>
 
 #define CLOUDFS_MAGIC 0x434C4453
 #define MAX_INODES 64
