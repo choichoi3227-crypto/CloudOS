@@ -1,5 +1,20 @@
 #include "sync.h"
 
+void spinlock_init(spinlock_t* lock) {
+    lock->locked = 0;
+}
+
+void mutex_init(mutex_t* m) {
+    spinlock_init(&m->lock);
+    m->locked = 0;
+    m->owner_pid = 0;
+}
+
+void sem_init(semaphore_t* s, int count) {
+    spinlock_init(&s->lock);
+    s->count = count;
+}
+
 // x86_64 xchg 명령어를 이용한 원자적 락 획득
 void spinlock_acquire(spinlock_t* lock) {
     __asm__ __volatile__(

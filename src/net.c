@@ -33,8 +33,8 @@ void net_handle_packet(uint8_t* data, uint32_t len) {
             r_arp->opcode = 0x0200;
             memcpy(r_arp->sender_mac, cloud_mac, 6);
             memcpy(r_arp->sender_ip, cloud_ip, 4);
-            memcpy(r_arp->dest_mac, arp->sender_mac, 6);
-            memcpy(r_arp->dest_ip, arp->sender_ip, 4);
+            memcpy(r_arp->target_mac, arp->sender_mac, 6);
+            memcpy(r_arp->target_ip, arp->sender_ip, 4);
             
             e1000_send_packet(reply, 42);
             vga_print("[NET] Replied to ARP request.\n");

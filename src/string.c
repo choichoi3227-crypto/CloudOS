@@ -24,6 +24,15 @@ void* memcpy(void* dest, const void* src, uint64_t n) {
     return dest;
 }
 
+int memcmp(const void* a, const void* b, uint64_t n) {
+    const uint8_t* pa = (const uint8_t*)a;
+    const uint8_t* pb = (const uint8_t*)b;
+    for (uint64_t i = 0; i < n; i++) {
+        if (pa[i] != pb[i]) return pa[i] - pb[i];
+    }
+    return 0;
+}
+
 void* memset(void* ptr, int value, uint64_t num) {
     uint8_t* p = (uint8_t*)ptr;
     while (num--) *p++ = (uint8_t)value;

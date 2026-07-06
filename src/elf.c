@@ -53,12 +53,11 @@ int elf_load_and_exec(const char* path) {
             // 여기서는 시스템 콜 라이브러리(libc)를 가상 메모리에 매핑한다고 가정
             vga_print("[ELF] Resolving Dynamic Links (libc.so)...\n");
             
-            uint64_t libc_base = 0x40000000; // 라이브러리 기본 주소
+            // TODO: syscall_handler_c가 아직 구현되어 있지 않아 GOT 매핑을 비활성화함.
+            // 실제 시스템 콜 핸들러가 만들어지면 이 블록을 복구해야 함.
             for (int j = 0; dyn[j].type != 0; j++) {
                 if (dyn[j].type == 3) { // DT_PLTGOT
-                    // GOT 테이블에 실제 함수 주소 기록
-                    uint64_t* got = (uint64_t*)(phdr[i].vaddr + dyn[j].offset);
-                    *got = (uint64_t)syscall_handler_c; // 시스템 콜 핸들러 주소 매핑
+                    // (미구현: syscall_handler_c 필요)
                 }
             }
         }
