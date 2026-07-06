@@ -50,3 +50,18 @@ void pmm_free_block(uint32_t block) {
     uint32_t idx = block / PAGE_SIZE;
     pmm_bitmap[idx / 32] &= ~(1 << (idx % 32));
 }
+
+// 추가: Slab 및 메모리 압축 로직에서 사용할 유휴 메모리 조회 함수
+uint32_t pmm_get_free_mem(void) {
+    uint32_t free_blocks = 0;
+    for(uint32_t i = 0; i < PMM_BITMAP_SIZE; i++) {
+        if(pmm_bitmap[i] != 0xFFFFFFFF) {
+            for(int j = 0; j < 32; j++) {
+                if(!(pmm_bitmap[i] & (1 << j))) {
+                    free_blocks++;
+                }
+            }
+        }
+    }
+    return free_blocks * PAGE_SIZE; // 바이트 단위로 반환
+}
