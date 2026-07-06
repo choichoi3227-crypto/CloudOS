@@ -5,12 +5,10 @@ int strcmp(const char* a, const char* b) {
     return *(const unsigned char*)a - *(const unsigned char*)b;
 }
 
-int strncmp(const char* a, const char* b, uint64_t n) {
-    for (uint64_t i = 0; i < n; i++) {
-        if (a[i] != b[i]) return a[i] - b[i];
-        if (a[i] == '\0') return 0;
-    }
-    return 0;
+char* strcpy(char* dest, const char* src) {
+    char* ret = dest;
+    while ((*dest++ = *src++));
+    return ret;
 }
 
 uint64_t strlen(const char* str) {
