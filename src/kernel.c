@@ -8,6 +8,7 @@
 #include "acpi.h"
 #include "audio.h"
 #include "security.h"
+#include "gpu.h"
 #include "string.h"
 #include "pmm.h"
 #include "vmm.h"
@@ -19,15 +20,42 @@
 #include "elf.h"
 #include "e1000.h"
 
-// ... (기존 multiboot_info 구조체 유지) ...
+struct multiboot_info {
+    uint32_t flags;
+    uint32_t mem_lower;
+    uint32_t mem_upper;
+    uint32_t boot_device;
+    uint32_t cmdline;
+    uint32_t mods_count;
+    uint32_t mods_addr;
+    uint32_t dummy[4];
+    uint32_t mmap_length;
+    uint32_t mmap_addr;
+    uint32_t drives_length;
+    uint32_t drives_addr;
+    uint32_t config_table;
+    uint32_t boot_loader_name;
+    uint32_t apm_table;
+    uint32_t vbe_control_info;
+    uint32_t vbe_mode_info;
+    uint16_t vbe_mode;
+    uint16_t vbe_interface_seg;
+    uint16_t vbe_interface_off;
+    uint16_t vbe_interface_len;
+    uint64_t framebuffer_addr;
+    uint32_t framebuffer_pitch;
+    uint32_t framebuffer_width;
+    uint32_t framebuffer_height;
+    uint8_t framebuffer_bpp;
+} __attribute__((packed));
 
 void kernel_main(struct multiboot_info* mb_info) {
     graphics_init(mb_info->framebuffer_addr, mb_info->framebuffer_pitch);
     
     vga_init(); 
     vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    vga_print("CloudOS Kernel v4.4 (Security Model)\n");
-    vga_print("====================================\n");
+    vga_print("CloudOS Kernel v4.5 (GPU Framework)\n");
+    vga_print("===================================\n");
     vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     
     idt_init();
@@ -42,11 +70,10 @@ void kernel_main(struct multiboot_info* mb_info) {
     acpi_init();
     audio_init();
     
-    vga_print("[ OK ] Initializing Security...\n");
-    security_init();
+    vga_print("[ OK ] Initializing GPU...\n");
+    gpu_init(); // GPU 프레임워크 초기화
     
-    // 간이 로그인 (자동 로그인: user 계정)
-    vga_print("[ OK ] Auto-login as 'user' (UID: 1).\n");
+    security_init();
     security_login(1);
     
     mouse_init();
@@ -74,7 +101,6 @@ void kernel_main(struct multiboot_info* mb_info) {
             draw_rect(0, 0, 1024, 30, 0x000000);
             draw_string("CloudOS", 10, 8, 0xFFFFFF);
             
-            // 현재 로그인된 사용자 표시
             user_context_t* user = security_get_current_user();
             if (user) {
                 draw_string("User: ", 200, 8, 0xFFFFFF);
