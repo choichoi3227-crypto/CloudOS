@@ -1,5 +1,4 @@
 #include "pmm.h"
-#include "vga.h"
 #include "string.h"
 
 #define PMM_BITMAP_SIZE 32768
@@ -19,7 +18,7 @@ void pmm_init(uint32_t* mmap_addr, uint32_t mmap_length) {
     uint32_t offset = 0;
     
     while(offset < mmap_length) {
-        if(entry->type == 1) { // Available RAM
+        if(entry->type == 1) {
             uint32_t start_block = entry->base_addr / PAGE_SIZE;
             uint32_t num_blocks = entry->length / PAGE_SIZE;
             for(uint32_t i = 0; i < num_blocks; i++) {
