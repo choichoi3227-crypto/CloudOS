@@ -7,6 +7,7 @@
 #include "vga.h"
 #include "vfs.h"
 #include "e1000.h"
+#include "security.h" // 추가
 
 struct idt_entry idt[256];
 struct idt_ptr idt_ptr;
@@ -95,18 +96,28 @@ void idt_init(void) {
 
 void syscall_handler_c(uint64_t syscall_num, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
     switch(syscall_num) {
-        case 0:
+        case 0: // sys_print
             vga_print((const char*)arg1);
             break;
-        case 1:
+        case 1: // sys_exit
             vga_print("\n[Syscall] User process exited.\n");
             while(1) { __asm__ __volatile__("hlt"); }
             break;
-        case 2:
-            vfs_write_file((const char*)arg1, (void*)arg2, arg3);
+        case 2: // sys_file_write
+            if (security_check_permission(PERM_FILE_WRITE)) {
+                vfs_write_file((const char*)arg1, (void*)arg2, arg3);
+            }
             break;
-        case 3:
-            vfs_read_file((const char*)arg1, (void*)arg2, arg3);
+        case 3: // sys_file_read
+            if (security_check_permission(PERM_FILE_READ)) {
+                vfs_read_file((const char*)arg1, (void*)arg2, arg3);
+            }
+            break;
+        case 4: // sys_network
+            if (security_check_permission(PERM_NETWORK)) {
+                // 네트워크 송수신 로직 호출
+                vga_print("[Syscall] Network access granted.\n");
+            }
             break;
     }
 }
