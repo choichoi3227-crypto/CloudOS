@@ -1,7 +1,6 @@
 #include "idt.h"
 #include "io.h"
 #include "keyboard.h"
-#include "vga.h"
 
 struct idt_entry idt[256];
 struct idt_ptr idt_ptr;
@@ -15,8 +14,6 @@ void idt_set_gate(int n, uint64_t handler) {
     idt[n].flags = 0x8E;
     idt[n].zero = 0;
 }
-
-extern void asm_irq_handler();
 
 void idt_init(void) {
     idt_ptr.limit = sizeof(struct idt_entry) * 256 - 1;
