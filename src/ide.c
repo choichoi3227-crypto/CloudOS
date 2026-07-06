@@ -1,5 +1,5 @@
-#include "ide.h"
-#include "io.h"
+#include <ide.h>
+#include <io.h>
 
 #define ATA_DATA 0x1F0
 #define ATA_ERROR 0x1F1
@@ -17,12 +17,11 @@ int ide_read_sectors(uint64_t lba, uint32_t count, void* buf) {
     outb(ATA_LBA_LO, lba & 0xFF);
     outb(ATA_LBA_MID, (lba >> 8) & 0xFF);
     outb(ATA_LBA_HI, (lba >> 16) & 0xFF);
-    outb(ATA_CMD, 0x20); // Read PIO
+    outb(ATA_CMD, 0x20);
 
     uint16_t* ptr = (uint16_t*)buf;
     for (uint32_t i = 0; i < count; i++) {
         while (!(inb(ATA_STATUS) & 0x08));
-        
         for (int j = 0; j < 256; j++) {
             ptr[j] = inw(ATA_DATA);
         }
@@ -37,12 +36,11 @@ int ide_write_sectors(uint64_t lba, uint32_t count, const void* buf) {
     outb(ATA_LBA_LO, lba & 0xFF);
     outb(ATA_LBA_MID, (lba >> 8) & 0xFF);
     outb(ATA_LBA_HI, (lba >> 16) & 0xFF);
-    outb(ATA_CMD, 0x30); // Write PIO
+    outb(ATA_CMD, 0x30);
 
     const uint16_t* ptr = (const uint16_t*)buf;
     for (uint32_t i = 0; i < count; i++) {
         while (!(inb(ATA_STATUS) & 0x08));
-        
         for (int j = 0; j < 256; j++) {
             outw(ATA_DATA, ptr[j]);
         }
