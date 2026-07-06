@@ -6,7 +6,8 @@ CFLAGS = -ffreestanding -O2 -Wall -Wextra -mno-red-zone -m64 -fno-stack-protecto
 LDFLAGS = -T linker.ld -m elf_x86_64 -nostdlib
 ASFLAGS = -f elf64
 
-C_SOURCES = src/kernel.c src/graphics.c src/mouse.c src/compositor.c src/idt.c src/keyboard.c src/string.c src/pmm.c src/vmm.c src/heap.c src/scheduler.c src/timer.c src/cloudfs_advanced.c src/ahci.c src/power_manager.c
+# 10점 만점 모듈 추가
+C_SOURCES = src/kernel.c src/graphics.c src/mouse.c src/compositor_pro.c src/idt.c src/keyboard.c src/string.c src/pmm.c src/vmm.c src/heap.c src/scheduler.c src/timer.c src/cloudfs_v3.c src/ahci.c src/power_acpi.c src/security_enhanced.c src/driver_framework.c src/app_subsystem.c
 ASM_SOURCES = src/boot.asm src/interrupt.asm src/gdt.asm
 OBJECTS = $(ASM_SOURCES:.asm=.o) $(C_SOURCES:.c=.o)
 
