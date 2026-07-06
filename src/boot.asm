@@ -5,15 +5,6 @@ header_start:
     dd 0
     dd header_end - header_start
     dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start))
-    
-    ; Framebuffer 태그 (비디오 모드 요청)
-    dw 5    ; type
-    dw 0    ; flags
-    dd 20   ; size
-    dd 1024 ; width
-    dd 768  ; height
-    dd 32   ; depth
-
     dw 0
     dw 0
     dd 8
@@ -41,6 +32,7 @@ extern kernel_main
 _start:
     mov esp, stack_top
 
+    ; 임시 4단계 페이징 (1GB Identity Map)
     mov eax, p3_table
     or eax, 0b11
     mov [p4_table], eax
