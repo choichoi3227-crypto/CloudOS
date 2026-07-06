@@ -1,4 +1,4 @@
-#include "vga.h"
+#include <vga.h>
 
 static uint16_t* const VGA_MEMORY = (uint16_t*)0xB8000;
 static int vga_row = 0;
