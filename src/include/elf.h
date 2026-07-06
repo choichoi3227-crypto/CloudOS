@@ -2,7 +2,7 @@
 #define ELF_H
 #include "types.h"
 
-#define ELF_MAGIC 0x464C457F // "\x7FELF"
+#define ELF_MAGIC 0x464C457F
 #define PT_LOAD 1
 
 typedef struct {
