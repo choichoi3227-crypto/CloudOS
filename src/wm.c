@@ -1,6 +1,7 @@
 #include "wm.h"
 #include "graphics.h"
 #include "acpi.h"
+#include "browser.h"
 #include "string.h"
 
 static window_t windows[MAX_WINDOWS];
@@ -26,19 +27,36 @@ int wm_create_window(int x, int y, int w, int h, const char* title) {
 }
 
 void wm_render(void) {
-    // 바탕화면 아이콘 (간략화)
+    // 바탕화면 아이콘
     draw_rect(20, 40, 40, 40, 0x4A90E2);
     draw_string("Files", 20, 85, 0xFFFFFF);
+    
+    // 브라우저 아이콘 (더블클릭 실행 유도)
+    draw_rect(20, 100, 40, 40, 0x34A853);
+    draw_string("Browser", 20, 145, 0xFFFFFF);
 
     // 창 렌더링
     for (int i = 0; i < window_count; i++) {
         window_t* win = &windows[i];
         if (win->is_open) {
+            // 스냅 상태일 경우 전체 화면으로 그림
+            if (win->is_dragging == 2) { // 2 = Snapped
+                draw_rect(0, 0, 512, 768, 0xFFFFFF);
+                draw_rect(0, 0, 512, 25, 0x333333);
+                draw_string(win->title, 10, 5, 0xFFFFFF);
+                continue;
+            }
+
             draw_rect(win->x + 3, win->y + 3, win->width, win->height, 0x111111);
             draw_rect(win->x, win->y, win->width, win->height, 0xFFFFFF);
             draw_rect(win->x, win->y, win->width, 25, 0x333333);
             draw_rect(win->x + 5, win->y + 5, 15, 15, 0xFF5F56);
             draw_string(win->title, win->x + 30, win->y + 5, 0xFFFFFF);
+            
+            // 창 이름이 Browser이면 내부에 브라우저 UI 렌더링
+            if (strcmp(win->title, "CloudBrowser") == 0) {
+                browser_render_page(win->x, win->y, win->width, win->height);
+            }
         }
     }
 
@@ -47,8 +65,6 @@ void wm_render(void) {
         draw_rect(0, 768 - 30 - 200, 200, 200, 0xDDDDDD);
         draw_rect(0, 768 - 30 - 200, 200, 30, 0x333333);
         draw_string("CloudOS Menu", 10, 768 - 30 - 190, 0xFFFFFF);
-        
-        // 종료 버튼
         draw_rect(10, 768 - 30 - 150, 180, 30, 0xFF5F56);
         draw_string("Shut Down", 50, 768 - 30 - 140, 0xFFFFFF);
     }
@@ -56,19 +72,32 @@ void wm_render(void) {
 
 void wm_handle_mouse(int mx, int my, int left_btn_down) {
     static int prev_btn = 0;
+    static int initial_click_x = 0, initial_click_y = 0;
     
     if (left_btn_down && !prev_btn) {
-        // 시작 메뉴 영역 클릭 (좌측 하단)
+        // 시작 메뉴 토글
         if (mx < 50 && my > 738) {
             start_menu_open = !start_menu_open;
             return;
         }
         
-        // 시작 메뉴가 열려있을 때 종료 버튼 클릭
+        // 시작 메뉴 종료 버튼
         if (start_menu_open) {
             if (mx >= 10 && mx <= 190 && my >= 768 - 30 - 150 && my <= 768 - 30 - 120) {
-                acpi_power_off(); // 시스템 종료
+                acpi_power_off();
             }
+        }
+
+        // 바탕화면 브라우저 아이콘 더블클릭 감지 (단순 클릭으로 대체하여 실행)
+        if (mx >= 20 && mx <= 60 && my >= 100 && my <= 140) {
+            for(int i=0; i<window_count; i++) {
+                if (strcmp(windows[i].title, "CloudBrowser") == 0) {
+                    windows[i].is_open = 1; // 이미 열려있으면 활성화
+                    return;
+                }
+            }
+            wm_create_window(300, 100, 600, 400, "CloudBrowser"); // 새로 열기
+            return;
         }
 
         // 창 인터랙션
@@ -83,6 +112,8 @@ void wm_handle_mouse(int mx, int my, int left_btn_down) {
                     win->is_dragging = 1;
                     win->drag_offset_x = mx - win->x;
                     win->drag_offset_y = my - win->y;
+                    initial_click_x = mx;
+                    initial_click_y = my;
                     active_window = i;
                 }
                 break;
@@ -90,9 +121,14 @@ void wm_handle_mouse(int mx, int my, int left_btn_down) {
         }
     } 
     else if (left_btn_down && prev_btn) {
-        if (active_window != -1 && windows[active_window].is_dragging) {
+        if (active_window != -1 && windows[active_window].is_dragging == 1) {
             windows[active_window].x = mx - windows[active_window].drag_offset_x;
             windows[active_window].y = my - windows[active_window].drag_offset_y;
+            
+            // Windows 스타일 창 스냅 (화면 좌측 끝으로 드래그 시 반으로 나눔)
+            if (windows[active_window].x <= 0) {
+                windows[active_window].is_dragging = 2; // Snapped 상태
+            }
         }
     } 
     else if (!left_btn_down && prev_btn) {
