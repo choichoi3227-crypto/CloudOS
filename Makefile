@@ -6,8 +6,7 @@ CFLAGS = -ffreestanding -O2 -Wall -Wextra -mno-red-zone -m64 -fno-stack-protecto
 LDFLAGS = -T linker.ld -m elf_x86_64 -nostdlib
 ASFLAGS = -f elf64
 
-# optimizer.c, subsystem.c, browser.c 추가 및 최적화 레벨 -O2 적용
-C_SOURCES = src/kernel.c src/graphics.c src/mouse.c src/wm.c src/usb.c src/acpi.c src/audio.c src/security.c src/gpu.c src/cloudoptimizer.c src/subsystem.c src/browser.c src/idt.c src/keyboard.c src/string.c src/pmm.c src/vmm.c src/heap.c src/task.c src/timer.c src/vfs.c src/cloudfs.c src/ahci.c src/elf.c src/e1000.c src/net.c
+C_SOURCES = src/kernel.c src/graphics.c src/mouse.c src/compositor.c src/idt.c src/keyboard.c src/string.c src/pmm.c src/vmm.c src/heap.c src/scheduler.c src/timer.c src/cloudfs_advanced.c src/ahci.c src/power_manager.c
 ASM_SOURCES = src/boot.asm src/interrupt.asm src/gdt.asm
 OBJECTS = $(ASM_SOURCES:.asm=.o) $(C_SOURCES:.c=.o)
 
@@ -36,4 +35,4 @@ clean:
     rm -rf isodir
 
 run: CloudOS.iso
-    qemu-system-x86_64 -cdrom CloudOS.iso -m 512M -drive file=disk.img,format=raw,id=disk,if=none -device ide-hd,drive=disk -netdev user,id=net0 -device e1000,netdev=net0
+    qemu-system-x86_64 -cdrom CloudOS.iso -m 512M -drive file=disk.img,format=raw,id=disk,if=none -device ide-hd,drive=disk
