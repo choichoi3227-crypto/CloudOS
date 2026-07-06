@@ -8,7 +8,6 @@ void vmm_init(void) {
     kernel_pml4 = (uint64_t*)pmm_alloc_block();
     for(int i = 0; i < 512; i++) kernel_pml4[i] = 0;
 
-    // 0~4GB 영역을 1:1(Identity) 매핑하여 커널 및 하드웨어 MMIO 접근 허용
     for (uint64_t i = 0; i < 1024; i++) {
         uint64_t virt = i * 0x200000;
         uint64_t phys = virt;
@@ -35,29 +34,23 @@ void vmm_init(void) {
             pd = (uint64_t*)(pdpt[pdpt_idx] & ~0xFFF);
         }
 
-        pd[pd_idx] = phys | 0x83; // Present | Writable | Huge Page
+        pd[pd_idx] = phys | 0x83;
     }
 }
 
-// 커널 PML4 주소 반환
 static uint64_t get_kernel_pml4() {
     return (uint64_t)kernel_pml4;
 }
 
-// 새로운 사용자 PML4 생성 (커널 공간 상위 256TB 복사)
 uint64_t vmm_create_user_pml4(void) {
     uint64_t* new_pml4 = (uint64_t*)pmm_alloc_block();
     memset(new_pml4, 0, 4096);
-    
-    // 커널 공간(인덱스 256~511) 복사
     for(int i = 256; i < 512; i++) {
         new_pml4[i] = kernel_pml4[i];
     }
-    
     return (uint64_t)new_pml4;
 }
 
-// 특정 PML4에 가상 주소 매핑
 void vmm_map_page_to_pml4(uint64_t pml4_addr, physaddr_t phys, virtaddr_t virt, uint32_t flags) {
     uint64_t* pml4 = (uint64_t*)pml4_addr;
     
@@ -96,7 +89,6 @@ void vmm_map_page_to_pml4(uint64_t pml4_addr, physaddr_t phys, virtaddr_t virt, 
     pt[pt_idx] = phys | flags | 0x1;
 }
 
-// 기본 커널 매핑용 (기존 호환성 유지)
 void* vmm_map_page(physaddr_t phys, virtaddr_t virt, uint32_t flags) {
     vmm_map_page_to_pml4(get_kernel_pml4(), phys, virt, flags);
     return (void*)virt;
