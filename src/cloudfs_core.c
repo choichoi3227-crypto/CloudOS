@@ -10,7 +10,6 @@ static cloudfs_superblock_t sb;
 static cloudfs_inode_t inodes[MAX_INODES];
 
 void cloudfs_init(void) {
-    // 슈퍼블록 읽기 (섹터 0)
     ide_read_sectors(0, 1, &sb);
     
     if (sb.magic != CLOUDFS_MAGIC) {
@@ -35,10 +34,7 @@ int cloudfs_write_file(const char* name, void* buf, uint32_t size) {
             inodes[i].start_sector = sb.data_start_sector + i;
             inodes[i].used = 1;
             
-            // 실제 데이터 디스크에 쓰기
             ide_write_sectors(inodes[i].start_sector, 1, buf);
-            
-            // 메타데이터(아이노드) 디스크에 쓰기
             ide_write_sectors(sb.inode_table_sector, 1, inodes);
             return size;
         }
@@ -49,7 +45,6 @@ int cloudfs_write_file(const char* name, void* buf, uint32_t size) {
 int cloudfs_read_file(const char* name, void* buf, uint32_t size) {
     for (int i = 0; i < MAX_INODES; i++) {
         if (inodes[i].used && strcmp(inodes[i].name, name) == 0) {
-            // 실제 데이터 디스크에서 읽기
             ide_read_sectors(inodes[i].start_sector, 1, buf);
             return inodes[i].size;
         }
