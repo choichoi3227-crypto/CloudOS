@@ -26,12 +26,18 @@ gdt64:
     dq gdt64
 
 section .text
+bits 32          ; <--- 1번 버그 수정: GRUB은 32비트 모드로 진입하므로 bits 32 명시
 global _start
 extern kernel_main
 
 _start:
     mov esp, stack_top
+    
+    ; <--- 2번 버그 수정: GRUB이 ebx에 담아준 멀티부트 정보 포인터를 
+    ; 64비트 모드 진입 후에도 잃어버리지 않도록 edi(하위 32비트)에 미리 백업
+    mov edi, ebx
 
+    ; 1GB 임시 페이징 설정 (Identity Map)
     mov eax, p3_table
     or eax, 0b11
     mov [p4_table], eax
@@ -88,10 +94,9 @@ long_mode_start:
     mov fs, ax
     mov gs, ax
 
-    ; GRUB 레지스터를 C 인자로 전달 (System V ABI)
-    mov rdi, rax
-    mov rsi, rbx
-    
+    ; 32비트에서 백업한 edi 값은 64비트로 전환되면서 자동으로 rdi의 하위 32비트에 위치하게 됨.
+    ; (상위 32비트는 0으로 클리어됨)
+    ; 따라서 rdi에는 멀티부트 정보 포인터가 정확히 담기게 됩니다.
     call kernel_main
 
     cli
