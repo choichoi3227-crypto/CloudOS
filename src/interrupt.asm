@@ -4,6 +4,7 @@ extern irq_handler_c
 
 global asm_irq_handler
 asm_irq_handler:
+    ; 레지스터 푸시 순서와 C 구조체 순서를 정확히 일치시킴
     push r15
     push r14
     push r13
