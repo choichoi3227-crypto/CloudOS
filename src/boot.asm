@@ -32,7 +32,6 @@ extern kernel_main
 _start:
     mov esp, stack_top
 
-    ; 임시 4단계 페이징 (1GB Identity Map)
     mov eax, p3_table
     or eax, 0b11
     mov [p4_table], eax
@@ -89,6 +88,7 @@ long_mode_start:
     mov fs, ax
     mov gs, ax
 
+    ; GRUB 레지스터를 C 인자로 전달 (System V ABI)
     mov rdi, rax
     mov rsi, rbx
     
