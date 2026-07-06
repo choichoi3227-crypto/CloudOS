@@ -1,5 +1,5 @@
-#include "keyboard.h"
-#include "io.h"
+#include <keyboard.h>
+#include <io.h>
 
 static char kb_buffer[256];
 static int kb_head = 0, kb_tail = 0;
