@@ -59,3 +59,21 @@ void draw_string(const char* str, int x, int y, uint32_t color) {
 void swap_buffers(void) {
     memcpy(framebuffer, backbuffer, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint32_t));
 }
+
+void draw_number(uint64_t num, int x, int y, uint32_t color) {
+    char buf[20];
+    int i = 0;
+    if (num == 0) {
+        draw_char('0', x, y, color);
+        return;
+    }
+    while (num > 0) {
+        buf[i++] = '0' + (num % 10);
+        num /= 10;
+    }
+    int cx = x;
+    while (i > 0) {
+        draw_char(buf[--i], cx, y, color);
+        cx += FONT_WIDTH;
+    }
+}
