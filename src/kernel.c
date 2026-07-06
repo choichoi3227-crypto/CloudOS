@@ -6,6 +6,7 @@
 #include "graphics.h"
 #include "usb.h"
 #include "acpi.h"
+#include "audio.h"
 #include "string.h"
 #include "pmm.h"
 #include "vmm.h"
@@ -51,8 +52,8 @@ void kernel_main(struct multiboot_info* mb_info) {
     
     vga_init(); 
     vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    vga_print("CloudOS Kernel v4.2 (ACPI Power)\n");
-    vga_print("================================\n");
+    vga_print("CloudOS Kernel v4.3 (Audio & Stability)\n");
+    vga_print("=======================================\n");
     vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     
     idt_init();
@@ -64,9 +65,10 @@ void kernel_main(struct multiboot_info* mb_info) {
     vfs_init();
     e1000_init();
     usb_init();
-    
-    vga_print("[ OK ] Initializing ACPI...\n");
     acpi_init();
+    
+    vga_print("[ OK ] Initializing Audio...\n");
+    audio_init();
     
     mouse_init();
     task_init();
