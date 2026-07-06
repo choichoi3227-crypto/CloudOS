@@ -16,6 +16,6 @@ typedef struct {
 } __attribute__((packed)) tcp_header_t;
 
 void tcp_handle_packet(ipv4_header_t* ip, uint8_t* payload, uint32_t len);
-void tcp_send(uint8_t* dest_ip, uint16_t dest_port, uint32_t seq, uint32_t ack, uint8_t flags);
+void tcp_send(uint32_t dest_ip, uint16_t dest_port, uint16_t src_port, uint32_t seq, uint32_t ack, uint8_t flags);
 
 #endif
