@@ -5,9 +5,18 @@
 #include "pmm.h"
 #include "cloudfs_core.h"
 
+// GRUB 멀티부트 정보 구조체 (정확한 오프셋 반영)
 struct multiboot_info {
-    uint32_t flags; uint32_t mem_lower; uint32_t mem_upper;
-    uint32_t dummy[8]; uint32_t mmap_length; uint32_t mmap_addr;
+    uint32_t flags;
+    uint32_t mem_lower;
+    uint32_t mem_upper;
+    uint32_t boot_device;
+    uint32_t cmdline;
+    uint32_t mods_count;
+    uint32_t mods_addr;
+    uint32_t dummy[4];
+    uint32_t mmap_length;
+    uint32_t mmap_addr;
 } __attribute__((packed));
 
 void kernel_main(struct multiboot_info* mb_info) {
