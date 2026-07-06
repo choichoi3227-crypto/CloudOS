@@ -1,45 +1,65 @@
 #include "slab.h"
-#include "vmm.h"
 #include "pmm.h"
 #include "string.h"
 
-#define ZRAM_COMPRESS_THRESHOLD 0x1000000 // 16MB 이상 사용 시 압축 활성화
+#define SLAB_SIZE 4096
+#define MAX_CACHES 16
 
 typedef struct slab_cache {
     size_t obj_size;
     void* free_list;
-    struct slab_cache* next;
+    int active;
 } slab_cache_t;
 
-static slab_cache_t* cache_head = NULL;
+static slab_cache_t caches[MAX_CACHES];
 
 void slab_init(void) {
-    // 커널 부팅 중 빈번히 생성되는 객체(struct file, struct task 등)를 위한 캐시 생성
+    for (int i = 0; i < MAX_CACHES; i++) caches[i].active = 0;
+}
+
+// 새로운 캐시 생성 (예: 파일 디스크립터용 128바이트 캐시)
+int slab_create_cache(size_t size) {
+    for (int i = 0; i < MAX_CACHES; i++) {
+        if (!caches[i].active) {
+            caches[i].obj_size = size;
+            caches[i].free_list = NULL;
+            caches[i].active = 1;
+            return i;
+        }
+    }
+    return -1;
 }
 
 void* slab_alloc(size_t size) {
-    // 캐시 풀에서 즉시 반환 (O(1) 할당)
-    slab_cache_t* cache = cache_head;
-    while (cache) {
-        if (cache->obj_size >= size && cache->free_list) {
-            void* obj = cache->free_list;
-            cache->free_list = *(void**)obj;
+    // 적절한 크기의 캐시 찾기
+    for (int i = 0; i < MAX_CACHES; i++) {
+        if (caches[i].active && caches[i].obj_size >= size) {
+            if (!caches[i].free_list) {
+                // 프리 리스트가 비었으면 PMM에서 4KB 페이지 할당받아 객체들로 채움
+                uint32_t page = pmm_alloc_block();
+                if (!page) return NULL;
+                
+                int num_objs = SLAB_SIZE / caches[i].obj_size;
+                for (int j = 0; j < num_objs; j++) {
+                    void* obj = (void*)(page + j * caches[i].obj_size);
+                    *(void**)obj = caches[i].free_list;
+                    caches[i].free_list = obj;
+                }
+            }
+            // 프리 리스트에서 객체 하나 반환
+            void* obj = caches[i].free_list;
+            caches[i].free_list = *(void**)obj;
             return obj;
         }
-        cache = cache->next;
     }
-    // 풀에 없으면 새 페이지 할당
-    return pmm_alloc_block(); 
+    return NULL; // 적절한 캐시 없음
 }
 
 void slab_free(void* ptr, size_t size) {
-    // 프리 리스트로 반환
-}
-
-// 메모리 압축 (ZRAM 에뮬레이션)
-void memory_compress_and_swap(void) {
-    if (pmm_get_free_mem() < ZRAM_COMPRESS_THRESHOLD) {
-        // LRU 페이지 테이블 순회, 압축률이 높은 페이지를 LZ4로 압축하여 메모리 내 별도 영역에 저장
-        // 디스크 I/O 발생시키지 않고 RAM 확보 (속도 저하 방지)
+    // 실제 구현에서는 ptr이 속한 캐시를 찾아 프리 리스트로 반환
+    // 여기서는 첫 번째 캐시로 가정
+    if (caches[0].active) {
+        *(void**)ptr = caches[0].free_list;
+        caches[0].free_list = ptr;
     }
 }
