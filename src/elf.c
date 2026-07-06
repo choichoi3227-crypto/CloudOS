@@ -37,13 +37,18 @@ int elf_load_and_exec(const char* path) {
     for (int i = 0; i < elf->phnum; i++) {
         if (phdr[i].type == PT_LOAD) {
             uint32_t pages = (phdr[i].memsz + 4095) / 4096;
+// ... 기존 코드 ...
             for (uint32_t p = 0; p < pages; p++) {
                 physaddr_t phys = pmm_alloc_block();
-                vmm_map_page_to_pml4(user_pml4, phys, phdr[i].vaddr + p * 4096, PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);
+                // PF_X (실행 가능) 플래그 확인 후 executable 전달
+                int executable = (phdr[i].flags & 0x1) ? 1 : 0;
+                vmm_map_page_to_pml4(user_pml4, phys, phdr[i].vaddr + p * 4096, PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER, executable);
                 memcpy((void*)phys, buf + phdr[i].offset + p * 4096, 4096);
             }
+// ... 기존 코드 ...
+            }
         }
-    }
+    
 
     kfree(buf);
     create_user_task_with_pml4(elf->entry, user_pml4);
