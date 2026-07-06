@@ -32,7 +32,7 @@ void vga_print_char(char c) {
         }
     }
     if (vga_row >= VGA_HEIGHT) {
-        vga_init(); // 간단화된 스크롤
+        vga_init();
     }
 }
 
