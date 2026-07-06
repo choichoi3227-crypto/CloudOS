@@ -10,6 +10,7 @@
 #include "vfs.h"
 #include "ahci.h"
 #include "elf.h"
+#include "e1000.h"
 
 struct multiboot_info {
     uint32_t flags;
@@ -27,8 +28,8 @@ struct multiboot_info {
 void kernel_main(struct multiboot_info* mb_info) {
     vga_init();
     vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    vga_print("CloudOS Kernel v3.3 (ELF Loader)\n");
-    vga_print("================================\n");
+    vga_print("CloudOS Kernel v3.4 (Network Stack)\n");
+    vga_print("===================================\n");
     vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     
     idt_init();
@@ -42,12 +43,14 @@ void kernel_main(struct multiboot_info* mb_info) {
     vga_print("[ OK ] Mounting CloudFS...\n");
     vfs_init();
     
+    vga_print("[ OK ] Initializing Network...\n");
+    e1000_init();
+    
     task_init();
     timer_init(100);
     
     __asm__ __volatile__("sti");
     
-    // 커널 쉘 루프
     while (1) {
         vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
         vga_print("admin@cloudos:~$ ");
@@ -64,7 +67,7 @@ void kernel_main(struct multiboot_info* mb_info) {
         cmd[idx] = '\0';
         
         if (strcmp(cmd, "help") == 0) {
-            vga_print("Commands: help, ls, write, read, run <file>, clear\n");
+            vga_print("Commands: help, ls, write, read, run, ping, clear\n");
         } else if (strcmp(cmd, "clear") == 0) {
             vga_init();
         } else if (strcmp(cmd, "ls") == 0) {
@@ -84,8 +87,9 @@ void kernel_main(struct multiboot_info* mb_info) {
             } else {
                 vga_print("File not found.\n");
             }
+        } else if (strcmp(cmd, "ping") == 0) {
+            vga_print("Waiting for ping from host... (Run 'ping 192.168.1.100' on Host OS)\n");
         } else if (strncmp(cmd, "run ", 4) == 0) {
-            // ELF 파일 실행
             elf_load_and_exec(cmd + 4);
         } else if (idx > 0) {
             vga_print("Unknown command: ");
