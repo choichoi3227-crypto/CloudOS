@@ -1,7 +1,7 @@
 #include "timer.h"
 #include "io.h"
 
-static uint64_t ticks = 0;
+uint64_t timer_ticks = 0; // 수정: static 제거 및 전역 변수 초기화
 
 void timer_init(uint32_t freq) {
     uint32_t divisor = 1193180 / freq;
@@ -11,5 +11,5 @@ void timer_init(uint32_t freq) {
 }
 
 void timer_handler(void) {
-    ticks++;
+    timer_ticks++;
 }
