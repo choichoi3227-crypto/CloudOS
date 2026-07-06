@@ -1,7 +1,6 @@
 CC = gcc
 LD = ld
 AS = nasm
-# -Isrc/include 추가하여 헤더 경로 문제 해결
 CFLAGS = -ffreestanding -O0 -Wall -Wextra -mno-red-zone -m64 -fno-stack-protector -Isrc/include
 LDFLAGS = -T linker.ld -m elf_x86_64 -nostdlib
 ASFLAGS = -f elf64
