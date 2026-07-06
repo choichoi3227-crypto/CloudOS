@@ -5,21 +5,8 @@
 #include "pmm.h"
 #include "cloudfs_core.h"
 
-// GRUB 멀티부트 정보 구조체 (정확한 오프셋 반영)
-struct multiboot_info {
-    uint32_t flags;
-    uint32_t mem_lower;
-    uint32_t mem_upper;
-    uint32_t boot_device;
-    uint32_t cmdline;
-    uint32_t mods_count;
-    uint32_t mods_addr;
-    uint32_t dummy[4];
-    uint32_t mmap_length;
-    uint32_t mmap_addr;
-} __attribute__((packed));
-
-void kernel_main(struct multiboot_info* mb_info) {
+// 부트로더에서 전달된 포인터를 직접 받음
+void kernel_main(void* mb_info) {
     vga_init();
     vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     vga_print("CloudOS Core v1.0 (Real Build)\n");
@@ -27,7 +14,9 @@ void kernel_main(struct multiboot_info* mb_info) {
     vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     
     idt_init();
-    pmm_init(mb_info->mmap_addr, mb_info->mmap_length);
+    
+    // Multiboot2 포인터를 PMM으로 전달하여 메모리 맵 파싱
+    pmm_init(mb_info);
     
     vga_print("[ OK ] Mounting CloudFS...\n");
     cloudfs_init();
