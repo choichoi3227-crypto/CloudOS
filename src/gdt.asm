@@ -4,6 +4,6 @@ global gdt_load_tss
 
 gdt_load_tss:
     lgdt [rdi]
-    mov ax, 0x28    ; TSS Selector
+    mov ax, 0x28
     ltr ax
     ret
