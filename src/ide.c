@@ -11,7 +11,6 @@
 #define ATA_CMD 0x1F7
 #define ATA_STATUS 0x1F7
 
-// 실제로 디스크에서 1섹터(512바이트)를 읽습니다.
 int ide_read_sectors(uint64_t lba, uint32_t count, void* buf) {
     outb(ATA_DRIVE, 0xE0 | ((lba >> 24) & 0x0F));
     outb(ATA_COUNT, count);
@@ -22,7 +21,6 @@ int ide_read_sectors(uint64_t lba, uint32_t count, void* buf) {
 
     uint16_t* ptr = (uint16_t*)buf;
     for (uint32_t i = 0; i < count; i++) {
-        // DRQ 비트 대기
         while (!(inb(ATA_STATUS) & 0x08));
         
         for (int j = 0; j < 256; j++) {
@@ -33,7 +31,6 @@ int ide_read_sectors(uint64_t lba, uint32_t count, void* buf) {
     return count * 512;
 }
 
-// 실제로 디스크에 1섹터(512바이트)를 씁니다.
 int ide_write_sectors(uint64_t lba, uint32_t count, const void* buf) {
     outb(ATA_DRIVE, 0xE0 | ((lba >> 24) & 0x0F));
     outb(ATA_COUNT, count);
@@ -44,7 +41,6 @@ int ide_write_sectors(uint64_t lba, uint32_t count, const void* buf) {
 
     const uint16_t* ptr = (const uint16_t*)buf;
     for (uint32_t i = 0; i < count; i++) {
-        // DRQ 비트 대기
         while (!(inb(ATA_STATUS) & 0x08));
         
         for (int j = 0; j < 256; j++) {
