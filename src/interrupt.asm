@@ -4,7 +4,6 @@ extern irq_handler_c
 
 global asm_irq_handler
 asm_irq_handler:
-    ; 레지스터 저장 (스택 프레임 구성)
     push r15
     push r14
     push r13
@@ -21,7 +20,7 @@ asm_irq_handler:
     push rbx
     push rax
     
-    mov rdi, rsp  ; 레지스터 프레임 주소 전달
+    mov rdi, rsp
     call irq_handler_c
     
     pop rax
