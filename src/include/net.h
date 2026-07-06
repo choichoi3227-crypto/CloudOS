@@ -43,7 +43,6 @@ typedef struct {
     uint16_t seq;
 } __attribute__((packed)) icmp_header_t;
 
-void net_init(void);
 void net_handle_packet(uint8_t* data, uint32_t len);
 
 #endif
