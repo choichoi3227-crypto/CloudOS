@@ -1,78 +1,60 @@
-#include <pmm.h>
-#include <string.h>
+// src/pmm.c (기존 파일 덮어쓰기)
+#include "pmm.h"
+#include "vga.h"
 
-#define PMM_BITMAP_SIZE 32768
-static uint32_t pmm_bitmap[PMM_BITMAP_SIZE];
+#define PAGE_SIZE 4096
+#define MAX_PAGES 65536 // 최대 256MB 물리 메모리 관리 가정
 
-struct multiboot_tag {
-    uint32_t type;
-    uint32_t size;
-} __attribute__((packed));
+static uint32_t physical_memory_bitmap[MAX_PAGES / 32];
+static uint32_t total_memory_kb = 0;
 
-struct multiboot_mmap_entry {
-    uint64_t base_addr;
-    uint64_t length;
-    uint32_t type;
-    uint32_t reserved;
-} __attribute__((packed));
-
-struct multiboot_tag_mmap {
-    uint32_t type;
-    uint32_t size;
-    uint32_t entry_size;
-    uint32_t entry_version;
-    struct multiboot_mmap_entry entries[];
-} __attribute__((packed));
-
-void pmm_init(void* mb_info) {
-    for(int i = 0; i < PMM_BITMAP_SIZE; i++) pmm_bitmap[i] = 0xFFFFFFFF;
+void pmm_init(uint32_t mem_kb) {
+    total_memory_kb = mem_kb;
+    uint32_t total_pages = (mem_kb * 1024) / PAGE_SIZE;
     
-    uint32_t* info = (uint32_t*)mb_info;
-    uint32_t total_size = info[0];
+    // 비트맵 초기화 (사용 가능한 메모리는 0으로 설정)
+    for (uint32_t i = 0; i < MAX_PAGES / 32; i++) {
+        physical_memory_bitmap[i] = 0xFFFFFFFF; // 일단 전부 할당됨으로 마킹
+    }
     
-    uint8_t* ptr = (uint8_t*)(info + 2); 
-    uint8_t* end = (uint8_t*)info + total_size;
-
-    while (ptr < end) {
-        struct multiboot_tag* tag = (struct multiboot_tag*)ptr;
-        
-        if (tag->type == 0) break;
-        
-        if (tag->type == 6) {
-            struct multiboot_tag_mmap* mmap_tag = (struct multiboot_tag_mmap*)ptr;
-            uint32_t entry_size = mmap_tag->entry_size;
-            
-            uint8_t* entry_ptr = (uint8_t*)mmap_tag->entries;
-            uint8_t* entries_end = ptr + tag->size;
-            
-            while (entry_ptr < entries_end) {
-                struct multiboot_mmap_entry* entry = (struct multiboot_mmap_entry*)entry_ptr;
-                if (entry->type == 1) {
-                    uint32_t start_block = entry->base_addr / PAGE_SIZE;
-                    uint32_t num_blocks = entry->length / PAGE_SIZE;
-                    for(uint32_t i = 0; i < num_blocks; i++) {
-                        if(start_block + i < PMM_BITMAP_SIZE * 32) {
-                            pmm_bitmap[(start_block + i) / 32] &= ~(1 << ((start_block + i) % 32));
-                        }
-                    }
-                }
-                entry_ptr += entry_size;
-            }
-        }
-        ptr += (tag->size + 7) & ~7; 
+    // 커널이 사용하는 영역(약 1MB)은 할당된 것으로 유지하고, 나머지는 해제
+    for (uint32_t i = 256; i < total_pages && i < MAX_PAGES; i++) { // 256페이지 = 1MB
+        uint32_t idx = i / 32;
+        uint32_t bit = i % 32;
+        physical_memory_bitmap[idx] &= ~(1 << bit);
     }
 }
 
-uint32_t pmm_alloc_block(void) {
-    for(uint32_t i = 0; i < PMM_BITMAP_SIZE; i++) {
-        if(pmm_bitmap[i] != 0xFFFFFFFF) {
-            for(int j = 0; j < 32; j++) {
-                if(!(pmm_bitmap[i] & (1 << j))) {
-                    pmm_bitmap[i] |= (1 << j);
-                    return (i * 32 + j) * PAGE_SIZE;
-                }
-            }
+uint32_t pmm_alloc_page(void) {
+    for (uint32_t i = 0; i < MAX_PAGES; i++) {
+        uint32_t idx = i / 32;
+        uint32_t bit = i % 32;
+        if (!(physical_memory_bitmap[idx] & (1 << bit))) {
+            physical_memory_bitmap[idx] |= (1 << bit); // 할당 마킹
+            return i * PAGE_SIZE;
         }
     }
-    return 0;
+    return 0; // Out of Memory
+}
+
+void pmm_free_page(uint32_t phys_addr) {
+    if (phys_addr == 0) return;
+    uint32_t page_idx = phys_addr / PAGE_SIZE;
+    if (page_idx >= MAX_PAGES) return;
+    
+    uint32_t idx = page_idx / 32;
+    uint32_t bit = page_idx % 32;
+    physical_memory_bitmap[idx] &= ~(1 << bit); // 해제 마킹
+}
+
+uint32_t pmm_get_free_memory(void) {
+    uint32_t free_pages = 0;
+    for (uint32_t i = 0; i < MAX_PAGES; i++) {
+        uint32_t idx = i / 32;
+        uint32_t bit = i % 32;
+        if (!(physical_memory_bitmap[idx] & (1 << bit))) {
+            free_pages++;
+        }
+    }
+    return (free_pages * PAGE_SIZE) / 1024;
 }
