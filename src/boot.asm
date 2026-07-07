@@ -1,105 +1,62 @@
+; src/boot.asm
+bits 32
+
+; Multiboot 헤더 (부트로더가 이 파일을 인식하게 함)
 section .multiboot
-align 8
-header_start:
-    dd 0xe85250d6
-    dd 0
-    dd header_end - header_start
-    dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start))
-    dw 0
-    dw 0
-    dd 8
-header_end:
+align 4
+    dd 0x1BADB002       ; 매직 넘버
+    dd 0x00             ; 플래그
+    dd -(0x1BADB002 + 0x00) ; 체크섬
 
 section .bss
 align 16
 stack_bottom:
-    resb 16384
+    resb 16384 ; 16KB 커널 스택
 stack_top:
 
-section .rodata
-gdt64:
-    dq 0
-.code: equ $ - gdt64
-    dq (1<<43) | (1<<44) | (1<<47) | (1<<53)
-.pointer:
-    dw $ - gdt64 - 1
-    dq gdt64
-
 section .text
-bits 32          ; <--- 1번 버그 수정: GRUB은 32비트 모드로 진입하므로 bits 32 명시
 global _start
 extern kernel_main
 
 _start:
+    ; 스택 포인터 설정
     mov esp, stack_top
-    
-    ; <--- 2번 버그 수정: GRUB이 ebx에 담아준 멀티부트 정보 포인터를 
-    ; 64비트 모드 진입 후에도 잃어버리지 않도록 edi(하위 32비트)에 미리 백업
-    mov edi, ebx
 
-    ; 1GB 임시 페이징 설정 (Identity Map)
-    mov eax, p3_table
-    or eax, 0b11
-    mov [p4_table], eax
+    ; ==========================================
+    ; VBE 그래픽 모드 설정 (1024x768x32bit)
+    ; ==========================================
+    mov ax, 0x4F02       ; VBE Set Mode 함수
+    mov bx, 0x4118       ; 1024x768, 32비트 색상 (Direct Color), LFB 사용
+    int 0x10             ; BIOS 비디오 인터럽트 호출
 
-    mov eax, p2_table
-    or eax, 0b11
-    mov [p3_table], eax
+    ; 설정된 모드 정보 가져오기
+    mov ax, 0x4F01
+    mov cx, 0x118        ; 요청한 모드 번호
+    int 0x10
 
-    mov ecx, 0
-.map_p2:
-    mov eax, 0x200000
-    mul ecx
-    or eax, 0b10000011
-    mov [p2_table + ecx * 8], eax
-    inc ecx
-    cmp ecx, 512
-    jne .map_p2
+    cmp ax, 0x004F       ; 지원 여부 확인
+    jne .fail_graphic
 
-    mov eax, p4_table
-    mov cr3, eax
+    ; VBE 정보 구조체에서 프레임버퍼 정보 추출
+    ; ES:DI에 정보가 들어옴 (Multiboot 규격상 전역 변수로 밀어 넣음)
+    mov eax, [es:di + 40] ; physical_address (프레임버퍼 주소)
+    mov [boot_fb_addr], eax
+    mov eax, [es:di + 16] ; bytes_per_scan_line (Pitch)
+    mov [boot_fb_pitch], eax
+    mov eax, [es:di + 12] ; width
+    mov [boot_fb_width], eax
+    mov eax, [es:di + 14] ; height
+    mov [boot_fb_height], eax
 
-    mov eax, cr4
-    or eax, 1 << 5
-    mov cr4, eax
+    jmp kernel_main
 
-    mov ecx, 0xC0000080
-    rdmsr
-    or eax, 1 << 8
-    wrmsr
-
-    mov eax, cr0
-    or eax, 1 << 31
-    mov cr0, eax
-
-    lgdt [gdt64.pointer]
-    jmp gdt64.code:long_mode_start
-
-section .bss
-align 4096
-p4_table:
-    resb 4096
-p3_table:
-    resb 4096
-p2_table:
-    resb 4096
-
-section .text
-bits 64
-long_mode_start:
-    mov ax, 0
-    mov ss, ax
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-
-    ; 32비트에서 백업한 edi 값은 64비트로 전환되면서 자동으로 rdi의 하위 32비트에 위치하게 됨.
-    ; (상위 32비트는 0으로 클리어됨)
-    ; 따라서 rdi에는 멀티부트 정보 포인터가 정확히 담기게 됩니다.
-    call kernel_main
-
-    cli
-.hang:
+.fail_graphic:
+    ; 그래픽 모드 실패 시 멈춤 (실사용 OS는 여기서 텍스트 모드로 폴백해야 함)
     hlt
-    jmp .hang
+    jmp .fail_graphic
+
+section .data
+boot_fb_addr: dd 0
+boot_fb_pitch: dd 0
+boot_fb_width: dd 0
+boot_fb_height: dd 0
