@@ -1,61 +1,38 @@
-# src/Makefile (기존 파일 완전 덮어쓰기)
+# src/Makefile (이전 것을 완전히 덮어쓰으세요)
 
-# 크로스 컴파일러 설정 (없으면 그냥 gcc 사용)
-CROSS_COMPILE = i686-elf-
-CC = $(CROSS_COMPILE)gcc
+# MSYS2에서 설치한 32비트 툴체인 사용 (i686 = 32비트)
+CC = i686-w64-mingw32-gcc
 AS = nasm
-LD = $(CROSS_COMPILE)ld
-OBJCOPY = $(CROSS_COMPILE)objcopy
+LD = i686-w64-mingw32-ld
 
-# 상용 OS 커널 컴파일 필수 플래그 (경고 무시, 최적화, 프리스탠딩)
-CFLAGS = -m32 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -nostdinc -Iinclude -w -fpermissive
+# 32비트 OS 전용 컴파일 옵션 (64비트 코드가 단 하나도 들어가지 않음)
+CFLAGS = -m32 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Iinclude -w -fpermissive
 ASFLAGS = -f elf32
 LDFLAGS = -m elf_i386 -T linker.ld --oformat binary
 
-# ==========================================
-# 핵심 마법: 하위 폴더까지 모두 자동 수집 (경로 오류 제로)
-# ==========================================
+# 모든 하위 폴더의 소스 자동 수집
 C_SOURCES = $(shell find . -name "*.c")
 ASM_SOURCES = $(shell find . -name "*.asm")
-
-C_OBJECTS = $(patsubst %.c, %.o, $(C_SOURCES))
-ASM_OBJECTS = $(patsubst %.asm, %.o, $(ASM_SOURCES))
-ALL_OBJECTS = $(ASM_OBJECTS) $(C_OBJECTS)
+ALL_OBJECTS = $(patsubst %.c, %.o, $(C_SOURCES)) $(patsubst %.asm, %.o, $(ASM_SOURCES))
 
 TARGET = ../CloudOS.bin
 
-.PHONY: all clean list
+.PHONY: all clean
 
 all: $(TARGET)
-    @echo ""
     @echo "=============================================="
-    @echo " [BUILD SUCCESS] CloudOS Kernel Built!"
-    @echo " Target: $(TARGET)"
-    @echo " Objects: $(words $(ALL_OBJECTS)) files compiled"
+    @echo " [BUILD SUCCESS] 32-bit CloudOS Built!"
     @echo "=============================================="
 
  $(TARGET): $(ALL_OBJECTS)
-    @echo "[LINKER] Linking kernel binary..."
     $(LD) $(LDFLAGS) -o $@ $^
 
-# C 파일 컴파일 규칙
 %.o: %.c
-    @echo "[CC] $<"
     $(CC) $(CFLAGS) -c $< -o $@
 
-# ASM 파일 컴파일 규칙
 %.o: %.asm
-    @echo "[ASM] $<"
     $(AS) $(ASFLAGS) $< -o $@
 
 clean:
-    @echo "[CLEAN] Removing object files..."
-    $(shell find . -name "*.o" -delete)
+    find . -name "*.o" -delete
     rm -f $(TARGET)
-
-# 현재 빌드 대상 파일들을 보여주는 디버깅 명령어
-list:
-    @echo "=== C Sources ==="
-    @echo $(C_SOURCES) | tr ' ' '\n'
-    @echo "=== ASM Sources ==="
-    @echo $(ASM_SOURCES) | tr ' ' '\n'
