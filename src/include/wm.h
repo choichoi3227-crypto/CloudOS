@@ -1,21 +1,17 @@
+// wm.h
 #ifndef WM_H
 #define WM_H
+
 #include "types.h"
+#include "wm_common.h" // wm_event_t 등 공용 타입 사용
 
-#define MAX_WINDOWS 5
-
-typedef struct {
-    int x, y, width, height;
-    char title[32];
-    int is_open;
-    int is_dragging;
-    int drag_offset_x, drag_offset_y;
-    int close_clicked; // 추가: 창 닫기 요청 플래그
-} window_t;
-
+// WM 초기화 및 메인 루프
 void wm_init(void);
-int wm_create_window(int x, int y, int w, int h, const char* title);
-void wm_render(void);
-void wm_handle_mouse(int mx, int my, int left_btn_down);
+void wm_run(void);
+
+// 앱에서 창을 제어하기 위한 API
+int wm_create_window(const char *title, int x, int y, int w, int h, int desktop_id, int is_dark_mode);
+int wm_close_window(int id);
+int wm_update_window(int id, int x, int y, int w, int h, const char *title, int is_dark_mode);
 
 #endif
