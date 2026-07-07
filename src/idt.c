@@ -1,74 +1,77 @@
-#include <idt.h>
-#include <io.h>
-#include <keyboard.h>
+// idt.c
+#include "idt.h"
+#include "types.h"
+#include "io.h"
+#include "vga.h"
 
-struct idt_entry idt[256];
-struct idt_ptr idt_ptr;
+// 인터럽트 설명자 구조체 (x86 표준)
+struct idt_entry {
+    uint16_t base_low;
+    uint16_t selector;
+    uint8_t  zero;
+    uint8_t  flags;
+    uint16_t base_high;
+} __attribute__((packed));
 
-void idt_set_gate(int n, uint64_t handler, int is_err) {
-    idt[n].base_low = handler & 0xFFFF;
-    idt[n].base_mid = (handler >> 16) & 0xFFFF;
-    idt[n].base_high = (handler >> 32) & 0xFFFFFFFF;
-    idt[n].selector = 0x08;
-    idt[n].ist = 0;
-    idt[n].flags = 0x8E;
-    idt[n].zero = 0;
+struct idt_ptr {
+    uint16_t limit;
+    uint32_t base;
+} __attribute__((packed));
+
+static struct idt_entry idt[256];
+static struct idt_ptr idtp;
+
+// 어셈블리 파일(interrupt.asm)에 있는 스텁 함수들
+extern void isr_stub_33();
+extern void isr_stub_44();
+
+// IDT 엔트리 설정 함수
+static void idt_set_gate(int num, uint32_t handler, uint16_t selector, uint8_t flags) {
+    idt[num].base_low = (handler & 0xFFFF);
+    idt[num].base_high = (handler >> 16) & 0xFFFF;
+    idt[num].selector = selector;
+    idt[num].zero = 0;
+    // flags: 0x8E = 인터럽트 게이트, 커널 모드(DPL=0), 항상 활성화(P=1)
+    idt[num].flags = flags;
 }
 
-extern void irq32();
-extern void irq33();
-extern void irq34();
-extern void irq35();
-extern void irq36();
-extern void irq37();
-extern void irq38();
-extern void irq39();
-extern void irq40();
-extern void irq41();
-extern void irq42();
-extern void irq43();
-extern void irq44();
-extern void irq45();
-extern void irq46();
-extern void irq47();
+// PIC(프로그래밍 가능한 인터럽트 컨트롤러) 초기화 및 리매핑
+static void pic_init(void) {
+    // 마스터 PIC(IRQ 0~7)을 인터럽트 32~39로 리매핑
+    outb(0x20, 0x11); // ICW1: 초기화 시작 + ICW4 필요
+    outb(0x21, 0x20); // ICW2: 마스터 PIC 오프셋을 32(0x20)으로 설정
+    outb(0x21, 0x04); // ICW3: 슬레이브 PIC가 IRQ2에 연결됨
+    outb(0x21, 0x01); // ICW4: 8086 모드
+
+    // 슬레이브 PIC(IRQ 8~15)를 인터럽트 40~47로 리매핑
+    outb(0xA0, 0x11);
+    outb(0xA1, 0x40); // ICW2: 슬레이브 PIC 오프셋을 40(0x40)으로 설정
+    outb(0xA1, 0x02); // ICW3: 슬레이브 식별자를 2로 설정 (마스터의 IRQ2)
+    outb(0xA1, 0x01); // ICW4: 8086 모드
+
+    // 모든 인터럽트 마스크 해제 (0x00 = 모두 허용)
+    outb(0x21, 0x00);
+    outb(0xA1, 0x00);
+}
 
 void idt_init(void) {
-    idt_ptr.limit = sizeof(struct idt_entry) * 256 - 1;
-    idt_ptr.base = (uint64_t)&idt;
+    vga_print("[IDT] Initializing PIC and IDT...\n");
     
-    for (int i = 0; i < 256; i++) idt_set_gate(i, 0, 0);
-    
-    idt_set_gate(32, (uint64_t)irq32, 0);
-    idt_set_gate(33, (uint64_t)irq33, 0);
-    idt_set_gate(34, (uint64_t)irq34, 0);
-    idt_set_gate(35, (uint64_t)irq35, 0);
-    idt_set_gate(36, (uint64_t)irq36, 0);
-    idt_set_gate(37, (uint64_t)irq37, 0);
-    idt_set_gate(38, (uint64_t)irq38, 0);
-    idt_set_gate(39, (uint64_t)irq39, 0);
-    idt_set_gate(40, (uint64_t)irq40, 0);
-    idt_set_gate(41, (uint64_t)irq41, 0);
-    idt_set_gate(42, (uint64_t)irq42, 0);
-    idt_set_gate(43, (uint64_t)irq43, 0);
-    idt_set_gate(44, (uint64_t)irq44, 0);
-    idt_set_gate(45, (uint64_t)irq45, 0);
-    idt_set_gate(46, (uint64_t)irq46, 0);
-    idt_set_gate(47, (uint64_t)irq47, 0);
-    
-    outb(0x20, 0x11); io_wait(); outb(0xA0, 0x11); io_wait();
-    outb(0x21, 0x20); io_wait(); outb(0xA1, 0x28); io_wait();
-    outb(0x21, 0x04); io_wait(); outb(0xA1, 0x02); io_wait();
-    outb(0x21, 0x01); io_wait(); outb(0xA1, 0x01); io_wait();
-    outb(0x21, 0x00); io_wait(); outb(0xA1, 0x00); io_wait();
-    
-    __asm__ __volatile__("lidt %0" : : "m"(idt_ptr));
-}
+    // 1. PIC 리매핑 (기존 예외 인터럽트 0~31과 겹치지 않게 밀어냄)
+    pic_init();
 
-void irq_handler_c(struct registers* regs) {
-    if (regs->int_no == 33) { // Keyboard
-        keyboard_handle_scancode(inb(0x60));
-        outb(0x20, 0x20);
-    } else {
-        outb(0x20, 0x20);
-    }
+    // 2. IDT 포인터 설정
+    idtp.limit = (sizeof(struct idt_entry) * 256) - 1;
+    idtp.base = (uint32_t)&idt;
+
+    // 3. 키보드(IRQ 1 -> 인터럽트 33) 매핑
+    idt_set_gate(33, (uint32_t)isr_stub_33, 0x08, 0x8E);
+    
+    // 4. 마우스(IRQ 12 -> 인터럽트 44) 매핑
+    idt_set_gate(44, (uint32_t)isr_stub_44, 0x08, 0x8E);
+
+    // 5. CPU에 IDT 테이블 위치 알림
+    asm volatile("lidt (%0)" : : "r"(&idtp));
+    
+    vga_print("[IDT] Hardware Interrupts Ready.\n");
 }
