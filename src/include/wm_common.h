@@ -2,8 +2,7 @@
 #ifndef WM_COMMON_H
 #define WM_COMMON_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include "types.h"
 
 // 화면 (기본값, 나중에 모드 설정에서 가져오도록 개선)
 #define SCREEN_W 1024
