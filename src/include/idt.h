@@ -1,9 +1,8 @@
+// idt.h
 #ifndef IDT_H
 #define IDT_H
-#include <types.h>
-struct registers { uint64_t r15, r14, r13, r12, r11, r10, r9, r8, rbp, rdi, rsi, rdx, rcx, rbx, rax, int_no, err_code, rip, cs, rflags, rsp, ss; };
-struct idt_entry { uint16_t base_low; uint16_t selector; uint8_t ist; uint8_t flags; uint16_t base_mid; uint32_t base_high; uint32_t zero; } __attribute__((packed));
-struct idt_ptr { uint16_t limit; uint64_t base; } __attribute__((packed));
+
+// PIC(프로그래밍 가능한 인터럽트 컨트롤러)와 IDT를 초기화하고 키보드/마우스 인터럽트를 활성화함
 void idt_init(void);
-void irq_handler_c(struct registers* regs);
+
 #endif
