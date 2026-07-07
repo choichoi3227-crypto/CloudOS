@@ -3,15 +3,14 @@
 #define WM_H
 
 #include "types.h"
-#include "wm_common.h" // wm_event_t 등 공용 타입 사용
+#include "wm_common.h"
 
-// WM 초기화 및 메인 루프
 void wm_init(void);
 void wm_run(void);
-
-// 앱에서 창을 제어하기 위한 API
 int wm_create_window(const char *title, int x, int y, int w, int h, int desktop_id, int is_dark_mode);
 int wm_close_window(int id);
-int wm_update_window(int id, int x, int y, int w, int h, const char *title, int is_dark_mode);
+
+// 인터럽트 핸들러에서 호출할 수 있는 퍼블릭 큐 인터페이스
+void wm_push_input_event(wm_event_t *ev);
 
 #endif
