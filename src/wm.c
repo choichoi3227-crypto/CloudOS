@@ -1,10 +1,10 @@
 // wm.c
-#include "wm_common.h"
+#include "wm.h"
 #include "graphics.h"
 #include "compositor.h"
 #include "keyboard.h"
 #include "mouse.h"
-#include <string.h>
+#include "string.h"
 
 // 전역 상태
 static wm_window_t windows[WM_MAX_WINDOWS];
@@ -13,12 +13,15 @@ static int next_window_id = 1;
 
 static int current_desktop = 0;
 static int mouse_x = 0, mouse_y = 0;
+
+// 드래그 상태
 static int drag_window_id = -1;
 static int drag_start_mx = 0, drag_start_my = 0;
 static int drag_start_wx = 0, drag_start_wy = 0;
 
+// 리사이즈 상태
 static int resize_window_id = -1;
-static int resize_edge = 0; // 비트: 1=left, 2=top, 4=right, 8=bottom
+static int resize_edge = 0; 
 static int resize_start_mx = 0, resize_start_my = 0;
 static int resize_start_wx = 0, resize_start_wy = 0;
 static int resize_start_ww = 0, resize_start_wh = 0;
@@ -37,7 +40,6 @@ static wm_window_t *window_by_id(int id) {
     return (idx >= 0) ? &windows[idx] : NULL;
 }
 
-// 새 창 생성 (앱에서 호출)
 int wm_create_window(const char *title, int x, int y, int w, int h, int desktop_id, int is_dark_mode) {
     int slot = -1;
     for (int i = 0; i < WM_MAX_WINDOWS; i++) {
@@ -45,37 +47,34 @@ int wm_create_window(const char *title, int x, int y, int w, int h, int desktop_
     }
     if (slot < 0) return -1; // 자리 없음
 
-    wm_window_t *w = &windows[slot];
-    w->id = next_window_id++;
-    w->x = x; w->y = y;
-    w->w = w; w->h = h;
-    w->state = WIN_STATE_NORMAL;
-    w->desktop_id = desktop_id;
-    w->is_dark_mode = is_dark_mode;
-    w->pixels = NULL;
-    w->pixels_dirty = 0;
+    wm_window_t *win = &windows[slot];
+    win->id = next_window_id++;
+    win->x = x; win->y = y;
+    win->w = w; win->h = h;
+    win->state = WIN_STATE_NORMAL;
+    win->desktop_id = desktop_id;
+    win->is_dark_mode = is_dark_mode;
+    win->pixels = NULL;
+    win->pixels_dirty = 0;
     if (title) {
-        strncpy(w->title, title, sizeof(w->title) - 1);
-        w->title[sizeof(w->title) - 1] = '\0';
+        strncpy(win->title, title, sizeof(win->title) - 1);
+        win->title[sizeof(win->title) - 1] = '\0';
     } else {
-        w->title[0] = '\0';
+        win->title[0] = '\0';
     }
-
     window_count++;
-    return w->id;
+    return win->id;
 }
 
-// 창 닫기
 int wm_close_window(int id) {
     wm_window_t *w = window_by_id(id);
     if (!w) return -1;
-    if (w->pixels) { /* TODO: w->pixels 해제 */ w->pixels = NULL; }
+    if (w->pixels) { w->pixels = NULL; } // TODO: 메모리 해제 로직 연결
     w->id = -1;
     window_count--;
     return 0;
 }
 
-// 창 속성 업데이트 (크기/위치/제목/테마)
 int wm_update_window(int id, int x, int y, int w, int h, const char *title, int is_dark_mode) {
     wm_window_t *win = window_by_id(id);
     if (!win) return -1;
@@ -91,32 +90,24 @@ int wm_update_window(int id, int x, int y, int w, int h, const char *title, int 
     return 0;
 }
 
-// 포인트가 창 안에 있는지
 static int point_in_window(wm_window_t *w, int px, int py) {
-    return (px >= w->x && px < w->x + w->w &&
-            py >= w->y && py < w->y + w->h);
+    return (px >= w->x && px < w->x + w->w && py >= w->y && py < w->y + w->h);
 }
 
-// 타이틀바 영역인지 (y < w->y + TITLEBAR_H)
 static int point_in_titlebar(wm_window_t *w, int px, int py) {
-    return (px >= w->x && px < w->x + w->w &&
-            py >= w->y && py < w->y + TITLEBAR_H);
+    return (px >= w->x && px < w->x + w->w && py >= w->y && py < w->y + TITLEBAR_H);
 }
 
-// 특정 좌표의 최상위 창 ID (z-order 마지막이 최상위)
 static int top_window_at(int x, int y) {
     for (int i = WM_MAX_WINDOWS - 1; i >= 0; i--) {
-        if (windows[i].id >= 0 &&
-            windows[i].desktop_id == current_desktop &&
-            windows[i].state != WIN_STATE_MINIMIZED &&
-            point_in_window(&windows[i], x, y)) {
+        if (windows[i].id >= 0 && windows[i].desktop_id == current_desktop &&
+            windows[i].state != WIN_STATE_MINIMIZED && point_in_window(&windows[i], x, y)) {
             return windows[i].id;
         }
     }
     return -1;
 }
 
-// Z-order 맨 위로 올리기
 static void raise_window(int id) {
     int idx = find_window_by_id(id);
     if (idx < 0) return;
@@ -127,37 +118,10 @@ static void raise_window(int id) {
     windows[WM_MAX_WINDOWS - 1] = tmp;
 }
 
-// 스냅 로직
-static void snap_window(int id, int side) {
-    wm_window_t *w = window_by_id(id);
-    if (!w) return;
-    if (side == 0) { // LEFT
-        w->x = 0;
-        w->y = TITLEBAR_H;
-        w->w = SNAP_LEFT_W;
-        w->h = SCREEN_H - TITLEBAR_H - TASKBAR_H;
-        w->state = WIN_STATE_NORMAL;
-    } else if (side == 1) { // RIGHT
-        w->x = SNAP_RIGHT_X;
-        w->y = TITLEBAR_H;
-        w->w = SNAP_RIGHT_W;
-        w->h = SCREEN_H - TITLEBAR_H - TASKBAR_H;
-        w->state = WIN_STATE_NORMAL;
-    } else if (side == 2) { // MAXIMIZE
-        w->x = 0;
-        w->y = TITLEBAR_H;
-        w->w = SCREEN_W;
-        w->h = SCREEN_H - TITLEBAR_H - TASKBAR_H;
-        w->state = WIN_STATE_MAXIMIZED;
-    }
-}
-
-// 리사이즈 엣지 판단 (창 경계 근처면 해당 엣지 비트 설정)
 static int calc_resize_edge(wm_window_t *w, int px, int py) {
     int edge = 0;
-    int border = 6; // 엣지 감지 두께
-    int in = point_in_window(w, px, py);
-    if (!in) return edge;
+    int border = 6; 
+    if (!point_in_window(w, px, py)) return edge;
     if (px < w->x + border) edge |= 1;  // left
     if (py < w->y + border) edge |= 2;  // top
     if (px >= w->x + w->w - border) edge |= 4;  // right
@@ -165,7 +129,6 @@ static int calc_resize_edge(wm_window_t *w, int px, int py) {
     return edge;
 }
 
-// 이벤트 처리 핸들러들
 static void handle_mouse_down(wm_event_t *ev) {
     int wid = top_window_at(ev->x, ev->y);
     if (wid < 0) return;
@@ -174,52 +137,40 @@ static void handle_mouse_down(wm_event_t *ev) {
     if (!w) return;
 
     if (ev->button == 1) {
-        // 타이틀바 클릭 -> 드래그 시작 또는 더블클릭 최대화
         if (point_in_titlebar(w, ev->x, ev->y)) {
-            // TODO: 더블클릭 감지해서 최대화 토글 구현 가능
+            // 닫기 버튼 체크 (우측 상단 16x16)
+            int bx = w->x + w->w - 20;
+            int by = w->y + 4;
+            if (ev->x >= bx && ev->x <= bx + 16 && ev->y >= by && ev->y <= by + 16) {
+                wm_close_window(wid);
+                return;
+            }
             drag_window_id = wid;
-            drag_start_mx = ev->x;
-            drag_start_my = ev->y;
-            drag_start_wx = w->x;
-            drag_start_wy = w->y;
+            drag_start_mx = ev->x; drag_start_my = ev->y;
+            drag_start_wx = w->x; drag_start_wy = w->y;
             return;
         }
-        // 엣지 근처 클릭 -> 리사이즈 시작
         int edge = calc_resize_edge(w, ev->x, ev->y);
         if (edge != 0) {
-            resize_window_id = wid;
-            resize_edge = edge;
-            resize_start_mx = ev->x;
-            resize_start_my = ev->y;
-            resize_start_wx = w->x;
-            resize_start_wy = w->y;
-            resize_start_ww = w->w;
-            resize_start_wh = w->h;
+            resize_window_id = wid; resize_edge = edge;
+            resize_start_mx = ev->x; resize_start_my = ev->y;
+            resize_start_wx = w->x; resize_start_wy = w->y;
+            resize_start_ww = w->w; resize_start_wh = w->h;
             return;
         }
     }
-    // 우클릭 등은 컨텍스트 메뉴용 (TODO)
 }
 
 static void handle_mouse_up(wm_event_t *ev) {
     if (ev->button == 1) {
-        if (drag_window_id >= 0) {
-            // 드래그 끝
-            drag_window_id = -1;
-        }
-        if (resize_window_id >= 0) {
-            // 리사이즈 끝
-            resize_window_id = -1;
-            resize_edge = 0;
-        }
+        drag_window_id = -1;
+        resize_window_id = -1;
+        resize_edge = 0;
     }
 }
 
 static void handle_mouse_move(wm_event_t *ev) {
-    mouse_x = ev->x;
-    mouse_y = ev->y;
-    int dx = ev->dx;
-    int dy = ev->dy;
+    mouse_x = ev->x; mouse_y = ev->y;
 
     if (drag_window_id >= 0) {
         wm_window_t *w = window_by_id(drag_window_id);
@@ -232,92 +183,52 @@ static void handle_mouse_move(wm_event_t *ev) {
     if (resize_window_id >= 0) {
         wm_window_t *w = window_by_id(resize_window_id);
         if (!w) return;
-        int new_x = resize_start_wx;
-        int new_y = resize_start_wy;
-        int new_w = resize_start_ww;
-        int new_h = resize_start_wh;
+        int new_x = resize_start_wx, new_y = resize_start_wy;
+        int new_w = resize_start_ww, new_h = resize_start_wh;
 
-        if (resize_edge & 1) { // left
-            int delta = ev->x - resize_start_mx;
-            new_x = resize_start_wx + delta;
-            new_w = resize_start_ww - delta;
-        }
-        if (resize_edge & 4) { // right
-            int delta = ev->x - resize_start_mx;
-            new_w = resize_start_ww + delta;
-        }
-        if (resize_edge & 2) { // top
-            int delta = ev->y - resize_start_my;
-            new_y = resize_start_wy + delta;
-            new_h = resize_start_wh - delta;
-        }
-        if (resize_edge & 8) { // bottom
-            int delta = ev->y - resize_start_my;
-            new_h = resize_start_wh + delta;
-        }
+        if (resize_edge & 1) { int delta = ev->x - resize_start_mx; new_x = resize_start_wx + delta; new_w = resize_start_ww - delta; }
+        if (resize_edge & 4) { new_w = resize_start_ww + (ev->x - resize_start_mx); }
+        if (resize_edge & 2) { int delta = ev->y - resize_start_my; new_y = resize_start_wy + delta; new_h = resize_start_wh - delta; }
+        if (resize_edge & 8) { new_h = resize_start_wh + (ev->y - resize_start_my); }
 
-        // 최소 크기 보장
         if (new_w < MIN_WIN_W) new_w = MIN_WIN_W;
         if (new_h < MIN_WIN_H) new_h = MIN_WIN_H;
 
-        w->x = new_x;
-        w->y = new_y;
-        w->w = new_w;
-        w->h = new_h;
+        w->x = new_x; w->y = new_y; w->w = new_w; w->h = new_h;
     }
 }
 
 static void handle_key_down(wm_event_t *ev) {
-    // Alt+Tab: 창 전환 (간단 예시)
-    if (ev->key == 0x0F && (ev->key & 0x100)) { // 임의 키 코드 매핑; 실제 키보드 드라이버에 맞춤
-        // TODO: 실제 Alt+Tab 조합 확인 방식에 맞게 수정
-        // 현재 데스크톱의 창들을 순환하며 활성화
-        int first = -1, prev = -1, active = -1;
-        for (int i = 0; i < WM_MAX_WINDOWS; i++) {
-            wm_window_t *w = &windows[i];
-            if (w->id < 0 || w->desktop_id != current_desktop) continue;
-            if (w->state == WIN_STATE_MINIMIZED) continue;
-            if (first < 0) first = w->id;
-            prev = active;
-            active = w->id;
-        }
-        if (first >= 0 && active >= 0) {
-            int next = (prev >= 0) ? prev : first;
-            raise_window(next);
-        }
+    // 예시: 특정 키로 데스크톱 전환 (실제 키보드 드라이버 스캔코드에 맞게 수정 필요)
+    if (ev->key == 0x01) { // 가정: 0x01이 데스크톱 전환 키
+        current_desktop = (current_desktop + 1) % WM_MAX_DESKTOPS;
+        compositor_switch_desktop(current_desktop);
     }
 }
 
-// 작업 표시줄 그리기
 static void draw_taskbar(void) {
     int y0 = SCREEN_H - TASKBAR_H;
     uint32_t bg = COLOR_LIGHT_BG;
-    graphics_fill_rect(0, y0, SCREEN_W, TASKBAR_H, bg);
+    draw_rect(0, y0, SCREEN_W, TASKBAR_H, bg);
 
-    // 간단한 시작 버튼 (좌측)
-    graphics_fill_rect(0, y0, 48, TASKBAR_H, 0xFF2D7D46);
-    graphics_draw_string("Start", 4, y0 + 8, COLOR_WHITE);
+    // 시작 버튼
+    draw_rect(0, y0, 48, TASKBAR_H, 0xFF2D7D46);
+    draw_string("Start", 4, y0 + 8, COLOR_WHITE);
 
-    // 현재 데스크톱의 창 목록 (간단 타이틀 표시)
+    // 현재 데스크톱 창 목록
     int xoff = 52;
     for (int i = 0; i < WM_MAX_WINDOWS; i++) {
         wm_window_t *w = &windows[i];
-        if (w->id < 0 || w->desktop_id != current_desktop) continue;
-        if (w->state == WIN_STATE_MINIMIZED) continue;
-        // 버튼 형태로 타이틀 표시
+        if (w->id < 0 || w->desktop_id != current_desktop || w->state == WIN_STATE_MINIMIZED) continue;
         int tw = graphics_measure_string(w->title) + 16;
         if (tw < 60) tw = 60;
-        if (xoff + tw > SCREEN_W - 8) break; // 오버플로 방지
-        graphics_fill_rect(xoff, y0 + 2, tw, TASKBAR_H - 4, 0xFF222222);
-        graphics_draw_string(w->title, xoff + 4, y0 + 8, COLOR_WHITE);
+        if (xoff + tw > SCREEN_W - 60) break; 
+        draw_rect(xoff, y0 + 2, tw, TASKBAR_H - 4, 0xFF222222);
+        draw_string(w->title, xoff + 4, y0 + 8, COLOR_WHITE);
         xoff += tw + 2;
     }
-
-    // 시계 (우측) – TODO: 실제 시간 가져오기
-    graphics_draw_string("00:00", SCREEN_W - 40, y0 + 8, COLOR_BLACK);
 }
 
-// WM 초기화
 void wm_init(void) {
     for (int i = 0; i < WM_MAX_WINDOWS; i++) {
         windows[i].id = -1;
@@ -329,61 +240,43 @@ void wm_init(void) {
     resize_window_id = -1;
 }
 
-// WM 메인 루프 (커널 메인에서 호출)
 void wm_run(void) {
     wm_init();
+    compositor_init();
 
-    // 테스트용 창 하나 생성
+    // 테스트용 창 생성
     wm_create_window("CloudOS Terminal", 40, 60, 640, 480, current_desktop, 0);
+    wm_create_window("File Manager", 200, 100, 500, 400, current_desktop, 1);
 
     while (1) {
-        // 입력 이벤트 수신 (키보드/마우스 드라이버에서 큐/버퍼로 읽어온다고 가정)
         wm_event_t ev = {0};
-        // TODO: 실제 드라이버에서 읽어오는 부분은 각자 구현
-        // 예: keyboard_poll_event(&ev); mouse_poll_event(&ev);
-        // 아래는 예시로 마우스 이벤트만 가정
+        // TODO: 실제 드라이버(keyboard.c, mouse.c)에서 이벤트를 폴링해서 ev에 채워 넣는 로직 구현
+        // 예: mouse_poll_event(&ev); keyboard_poll_event(&ev);
         ev.type = WM_EVENT_MOUSE_MOVE;
-        ev.x = mouse_x;
-        ev.y = mouse_y;
-        // ev.dx, ev.dy, ev.button, ev.key 등은 드라이버가 채움
+        ev.x = mouse_x; ev.y = mouse_y;
 
-        if (ev.type == WM_EVENT_MOUSE_DOWN) {
-            handle_mouse_down(&ev);
-        } else if (ev.type == WM_EVENT_MOUSE_UP) {
-            handle_mouse_up(&ev);
-        } else if (ev.type == WM_EVENT_MOUSE_MOVE) {
-            handle_mouse_move(&ev);
-        } else if (ev.type == WM_EVENT_KEY_DOWN) {
-            handle_key_down(&ev);
-        } else if (ev.type == WM_EVENT_WINDOW_SNAP_LEFT) {
-            int wid = ev.window_id;
-            if (wid < 0) wid = top_window_at(mouse_x, mouse_y);
-            snap_window(wid, 0);
+        if (ev.type == WM_EVENT_MOUSE_DOWN) handle_mouse_down(&ev);
+        else if (ev.type == WM_EVENT_MOUSE_UP) handle_mouse_up(&ev);
+        else if (ev.type == WM_EVENT_MOUSE_MOVE) handle_mouse_move(&ev);
+        else if (ev.type == WM_EVENT_KEY_DOWN) handle_key_down(&ev);
+        else if (ev.type == WM_EVENT_WINDOW_SNAP_LEFT) {
+            int wid = ev.window_id; if (wid < 0) wid = top_window_at(mouse_x, mouse_y);
+            compositor_snap_window(window_by_id(wid), 0);
         } else if (ev.type == WM_EVENT_WINDOW_SNAP_RIGHT) {
-            int wid = ev.window_id;
-            if (wid < 0) wid = top_window_at(mouse_x, mouse_y);
-            snap_window(wid, 1);
+            int wid = ev.window_id; if (wid < 0) wid = top_window_at(mouse_x, mouse_y);
+            compositor_snap_window(window_by_id(wid), 1);
         } else if (ev.type == WM_EVENT_WINDOW_MAXIMIZE) {
-            int wid = ev.window_id;
-            if (wid < 0) wid = top_window_at(mouse_x, mouse_y);
-            snap_window(wid, 2);
-        } else if (ev.type == WM_EVENT_DESKTOP_SWITCH) {
-            int new_desk = ev.desktop_id;
-            if (new_desk >= 0 && new_desk < WM_MAX_DESKTOPS) {
-                current_desktop = new_desk;
-            }
+            int wid = ev.window_id; if (wid < 0) wid = top_window_at(mouse_x, mouse_y);
+            compositor_snap_window(window_by_id(wid), 2);
         }
 
-        // 컴포지터에게 렌더링 지시 (damage만 갱신)
-        compositor_render_desktop(current_desktop, &windows[0], WM_MAX_WINDOWS);
+        // 컴포지터 렌더링 (백버퍼 → 프론트버퍼)
+        compositor_render_desktop(current_desktop, windows, WM_MAX_WINDOWS);
 
-        // 작업 표시줄은 매 프레임 그림 (단순화)
+        // 작업 표시줄은 프론트버퍼에 직접 그림
         draw_taskbar();
 
-        // 프레임 버퍼 스왑 (더블버퍼링은 compositor.c에서 담당)
-        graphics_swap_buffers();
-
-        // 유휴 대기 (타이머/인터럽트 기반 sleep)
-        // schedule_yield(); // 스케줄러가 있으면 호출
+        // 유휴 대기
+        // schedule_yield(); 
     }
 }
