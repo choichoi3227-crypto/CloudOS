@@ -4,20 +4,27 @@
 
 #include "types.h"
 
-// 화면 (기본값, 나중에 모드 설정에서 가져오도록 개선)
 #define SCREEN_W 1024
 #define SCREEN_H 768
 
-// 색상 (ARGB: 0xAARRGGBB, 그리기 함수에서 사용)
-#define COLOR_TRANSPARENT 0x00000000u
-#define COLOR_BLACK       0xFF000000u
-#define COLOR_WHITE       0xFFFFFFFFu
-#define COLOR_DARK_BG     0xFF1E1E2Eu // 다크 테마 배경
-#define COLOR_LIGHT_BG    0xFFF0F0F0u // 라이트 테마 배경
-#define COLOR_TITLEBAR_DARK  0xFF111111u
-#define COLOR_TITLEBAR_LIGHT 0xFF333333u
+// 상용 OS급 색상 팔레트 (Windows 11 / macOS Ventura 스타일)
+#define COLOR_TRANSPARENT  0x00000000u
+#define COLOR_BLACK        0xFF000000u
+#define COLOR_WHITE        0xFFFFFFFFu
+#define COLOR_DARK_BG      0xFF202020u
+#define COLOR_LIGHT_BG     0xFFF3F3F3u
+#define COLOR_TITLEBAR_ACT 0xFF0078D4u // 활성 창 타이틀바 (액센트 블루)
+#define COLOR_TITLEBAR_INC 0xFF2D2D2Du // 비활성 창 타이틀바
+#define COLOR_CLIENT_DARK  0xFF1E1E1Eu
+#define COLOR_CLIENT_LIGHT 0xFFFFFFFFu
+#define COLOR_SHADOW       0x40000000u // 25% 투명도 그림자
+#define COLOR_TASKBAR_BG   0xFF1F1F1Fu
+#define COLOR_TASKBAR_BTN  0xFF333333u
+#define COLOR_BTN_CLOSE    0xFFC42B1Cu
+#define COLOR_BTN_MAX      0xFF00000000u
+#define COLOR_TEXT_WHITE   0xFFFFFFFFu
+#define COLOR_TEXT_GRAY    0xFF999999u
 
-// 창 상태
 typedef enum {
     WIN_STATE_NORMAL = 0,
     WIN_STATE_MINIMIZED,
@@ -25,62 +32,58 @@ typedef enum {
     WIN_STATE_FULLSCREEN
 } window_state_t;
 
-// 창 속성
 typedef struct {
-    int id;                 // 창 ID (0 이상, -1이면 미사용)
-    int x, y;               // 위치
-    int w, h;               // 크기
-    window_state_t state;   // 현재 상태
-    int desktop_id;         // 소속 데스크톱 ID
-    int is_dark_mode;       // 다크 모드 여부
-    char title[128];        // 타이틀 텍스트
-
-    // 렌더링용 버퍼 포인터 (이 창의 픽셀 데이터)
-    uint32_t *pixels;       // (w * h) 픽셀, NULL이면 컴포지터가 타이틀바만 그림
-    int pixels_dirty;       // 1이면 이 창의 pixels가 변경됨 (damage)
+    int id;
+    int x, y, w, h;
+    window_state_t state;
+    int desktop_id;
+    int is_dark_mode;
+    char title[128];
+    uint32_t *pixels;
+    int pixels_dirty;
+    int is_focused; // 상용 OS 필수: 포커스 상태
 } wm_window_t;
 
-// 입력 이벤트 타입
 typedef enum {
     WM_EVENT_NONE = 0,
     WM_EVENT_MOUSE_MOVE,
     WM_EVENT_MOUSE_DOWN,
     WM_EVENT_MOUSE_UP,
-    WM_EVENT_MOUSE_WHEEL,
     WM_EVENT_KEY_DOWN,
     WM_EVENT_KEY_UP,
-    WM_EVENT_WINDOW_CLOSE,     // 타이틀바 X 버튼 등
-    WM_EVENT_WINDOW_SNAP_LEFT,
-    WM_EVENT_WINDOW_SNAP_RIGHT,
+    WM_EVENT_WINDOW_CLOSE,
     WM_EVENT_WINDOW_MAXIMIZE,
     WM_EVENT_WINDOW_MINIMIZE,
-    WM_EVENT_DESKTOP_SWITCH,   // 가상 데스크톱 전환 요청
-    WM_EVENT_APP_LAUNCH        // 앱 실행 요청 (파라미터로 경로 등)
+    WM_EVENT_DESKTOP_SWITCH
 } wm_event_type_t;
 
-// 입력 이벤트 구조체
 typedef struct {
     wm_event_type_t type;
-    int x, y;           // 마우스 위치 (절대 좌표)
-    int dx, dy;         // 마우스 이동 델타 (드래그 계산용)
-    int button;         // 마우스 버튼 (1=left, 2=right, 3=middle)
-    int key;            // 키 코드
-    int window_id;      // 이벤트가 속한 창 ID (음수면 전역)
-    int desktop_id;     // 대상 데스크톱 ID (데스크톱 전환용)
-    char app_path[256]; // APP_LAUNCH 시 실행 파일 경로
+    int x, y;
+    int dx, dy;
+    int button;
+    int key;
+    int window_id;
 } wm_event_t;
 
-// 창 관련 옵션/플래그
 #define WM_MAX_WINDOWS 64
-#define TASKBAR_H 32            // 하단 작업 표시줄 높이
-#define TITLEBAR_H 24           // 타이틀바 높이
-#define SNAP_LEFT_W  (SCREEN_W / 2)
-#define SNAP_RIGHT_X (SCREEN_W / 2)
-#define SNAP_RIGHT_W (SCREEN_W / 2)
-#define MIN_WIN_W 120
-#define MIN_WIN_H 80
-
-// 데스크톱 수 (초기)
 #define WM_MAX_DESKTOPS 4
+#define TASKBAR_H 40
+#define TITLEBAR_H 32
+#define BORDER_W 1
+#define MIN_WIN_W 200
+#define MIN_WIN_H 150
+
+// 상용 OS 필수: 원형 이벤트 큐 (인터럽트에서 안전하게 push)
+#define WM_EVENT_QUEUE_SIZE 1024
+typedef struct {
+    wm_event_t events[WM_EVENT_QUEUE_SIZE];
+    int head;
+    int tail;
+} wm_event_queue_t;
+
+void wm_event_queue_init(wm_event_queue_t *q);
+int wm_event_queue_push(wm_event_queue_t *q, wm_event_t *ev);
+int wm_event_queue_pop(wm_event_queue_t *q, wm_event_t *out);
 
 #endif // WM_COMMON_H
