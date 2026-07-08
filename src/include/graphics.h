@@ -1,4 +1,4 @@
-// graphics.h
+// src/include/graphics.h (기존 파일 덮어쓰기)
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
@@ -17,13 +17,14 @@ void draw_string(const char *str, int x, int y, uint32_t color);
 void draw_number(uint64_t num, int x, int y, uint32_t color);
 void swap_buffers(void);
 
-// 상용 OS 그래픽 파이프라인
 void graphics_fill_rect_on_buffer(uint32_t *buf, int buf_w, int buf_h, int x, int y, int w, int h, uint32_t color);
 void graphics_draw_string_on_buffer(uint32_t *buf, int buf_w, int buf_h, const char *s, int x, int y, uint32_t fg);
 void graphics_copy_buffer_to_framebuffer(const uint32_t *src, int src_w, int src_h);
 int graphics_measure_string(const char *s);
 
-// 하드웨어 시계 (작업표시줄 시계용)
+// [새로 추가] 특정 메모리 버퍼에 단일 문자 그리기 (터미널용)
+void graphics_draw_char_on_buffer(uint32_t *buf, int buf_w, int buf_h, char c, int x, int y, uint32_t fg);
+
 typedef struct { int year, month, day, hour, minute, second; } rtc_time_t;
 void read_rtc(rtc_time_t *t);
 
